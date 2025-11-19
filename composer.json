@@ -1,0 +1,37 @@
+{
+    "name": "daandelange/clavisverbum",
+    "description": "A multlanguage taxonomy field for Kirby.",
+    "homepage": "https://github.com/Daandelange/kirby-clavisverbum",
+    "type": "kirby-plugin",
+    "version": "0.0.1",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Daan de Lange",
+            "role": "Developer"
+        }
+    ],
+    "keywords": [
+        "kirby5",
+        "kirby-plugin",
+        "kirby-cms",
+        "kirby-field"
+    ],
+    "require": {
+        "getkirby/composer-installer": "^1.1",
+        "daandelange/helpers": "dev-main"
+    },
+    "scripts": {
+
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "allow-plugins": {
+            "getkirby/composer-installer": true
+        }
+    },
+    "extra": {
+        "installer-name": "clavisverbum",
+        "kirby-plugin-path": "../"
+    }
+}
