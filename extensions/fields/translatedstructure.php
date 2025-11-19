@@ -55,6 +55,13 @@ return A::append( $nativeStructureFieldBlueprint, [
 
             return $fields;
         },
+        
+        // Globar user fields parsing function
+        'parseFields' => function(array $userFields) : array{
+            $userFields = $this->expandTranslateableFields($userFields);
+            return $userFields;
+        },
+
         // Overrides structure form which grabs the form from $this->attrs['fields'] which isn't set soon enough.
         // Until https://github.com/getkirby/kirby/issues/4107 is merged, and after we'll need this for compatibility with older kirby versions.
         // 'form' => function (array $values = []) { 
@@ -87,7 +94,7 @@ return A::append( $nativeStructureFieldBlueprint, [
         },
         // Auto fields builder : a key and one entry per language
         'fields' => function(array $customFields=[]){ // Default [] = a name field
-            $fields = $this->expandTranslateableFields($customFields);
+            $fields = $this->parseFields($customFields);
 
             // hack trough Kirby's API to ensure every value is set soon enough. It's a way of applying props in the way Kirby does.
             // Sensitive code (might break if Kirby changes internally)
@@ -125,7 +132,6 @@ return A::append( $nativeStructureFieldBlueprint, [
     'computed' => [
         // Make the panel use the native structure field 
         'type'  => function(){ return 'structure'; },
-        //'type'  => 'taxonomystructure', // Use a custom field
 
         // Filter the native columns
         'columns' => function() {
@@ -135,64 +141,30 @@ return A::append( $nativeStructureFieldBlueprint, [
             //$columns = \Closure::fromCallable($nativeStructureFieldBlueprint['computed']['columns'])->call($this);
             
             if(count($this->fields)<=0){
-                //throw new InvalidArgumentException('Internal orchestration error in the translatedstructure field.');
                 // No fields props: return originalcolumns
                 return $columns;
             }
 
-            // Adapt data (filter out fields for preview)
-            foreach($columns as $key=>$column){
-                // Grab field props
-                $field = $this->fields[$key];
-                if(is_array($field)){
-                    // Remove key preview ?
-                    $hideFields = $this->hiddenpreviewfields();//props['hiddenpreviewfields'];
-                    if($hideFields !== false && is_array($hideFields) && !empty($hideFields)){
-                        if(in_array($field['name'], $hideFields)){
-                            unset($columns[$key]);
-                            continue;
-                        }
-                    }
-
-                    if( isset($field['istranslatedfield']) && $field['istranslatedfield']===true ){
-                        // Reset field to original label (for usage by template strings)
-                        $field['label'] = $field['labelorig']??$field['label'];
-                        
-                        // Remove alt languages from preview columns
-                        if(option('daandelange.taxonomy.preview.showDefaultOnly', true)){
-                            if(isset($field['isdefaultlang'])){
-                                // Remove col ?
-                                if($field['isdefaultlang']===false){
-                                    unset($columns[$key]);
-                                    continue;
-                                }
-                                // Remove language from label
-                                else {
-                                    $columns[$key]['label'] = \Kirby\Toolkit\Str::template(option('daandelange.taxonomy.preview.shortLabel', '{{ field.label }}'), ['field'=>$field, 'language'=>kirby()->language($field['langcode']??null)], ['fallback' => '-']);
-                                    continue;
-                                }
-                            }
-                        }
-
-                        // Rename remaining columns
-                        $previewLabel = option('daandelange.taxonomy.preview.longLabel', '{{ field.label }} / {{ language.code }}');
-                        if(!empty($previewLabel)){
-                            $columns[$key]['label'] = \Kirby\Toolkit\Str::template($previewLabel, ['field'=>$field, 'language'=>kirby()->language($field['langcode']??null)], ['fallback' => '-']);
-                                continue;
-                        }
-                    }
-                }
-            }
+            // // Adapt data (filter out fields for preview)
+            $columns = TaxonomyHelper::filterTranslatedStructureColumnsProps(
+                $columns,
+                $this->fields,
+                option('daandelange.taxonomy.preview.showDefaultOnly', true),
+                $this->hiddenpreviewfields(),
+                option('daandelange.taxonomy.preview.longLabel', '{{ field.label }} / {{ language.code }}'),
+                option('daandelange.taxonomy.preview.shortLabel', '{{ field.label }}')
+            );
             return $columns;
         },
     ],
     'collectionFilters' => [
         // Is this still useful ?
-        'removeduplicates' => function ($collection, $field, $uniqueFieldKey = 'id') {
+        'removeduplicates' => function (\Kirby\Cms\Collection $collection, $field, $uniqueFieldKey = 'id', $split=false) {
             $existing = [];
             foreach ($collection->data as $key => $item ) {
-                if( in_array($collection->{$uniqueFieldKey}(), $existing) ) unset($collection->$key);
-                else $existing[] = $collection->{$uniqueFieldKey}();
+                $itemValue = $collection->getAttribute($item, $uniqueFieldKey, $split);
+                if( in_array($itemValue, $existing) ) unset($collection->$key);
+                else $existing[] = $itemValue;
             }
             return $collection;
         }

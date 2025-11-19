@@ -19,10 +19,8 @@ return [
     'methods' => [
         // Override this to parse the options. At least needed to ensure keys are slugs when the content file is manually edited.
         'getOptions' => function () {
-            // Warning: Behaviour refactored since 3.8.2
-            // See https://github.com/getkirby/kirby/commit/bff9fb2
             // Original func from config/fields/mixins/options.php
-            $props   = FieldOptions::polyfill($this->props);
+            $props   = FieldOptions::polyfill($this->props); // Standardize options (with old APIs?)
             if(!isset($props['options']['info'])) $props['options']['info']='{{ structureItem.info }}';
             if(!isset($props['options']['icon'])) $props['options']['icon']='tag';
             $options = FieldOptions::factory($props['options']);
@@ -56,12 +54,11 @@ return [
         },
         'getBoundStructureField' => function( ) : \Kirby\Form\Field {
             $structureCmsField = $this->getBoundStructureFieldCms();
-            // $bp = $structureCmsField->getFieldBlueprint();
-            $bp = BlueprintHelper::getFieldBlueprint($structureCmsField);
-            // Eventually pass to \Kirby\Cms\Blueprint::fieldProps() to sanitize
-            $structureFieldBlueprint = \Kirby\Cms\Blueprint::fieldProps($bp);
+            $structureFieldBlueprint = BlueprintHelper::getFieldBlueprint($structureCmsField, true);
+
+            // Secure
             if(!in_array($structureFieldBlueprint['type'], ['taxonomystructure', 'structure'])){
-                throw new \Exception("The taxonomy bindings do not point to a structure field !");
+                throw new \Exception("The taxonomy binding does not point to a structure field !");
             }
             
             $structureFieldBlueprint['model'] = $structureCmsField->model();
@@ -164,6 +161,8 @@ return [
                     'query' => $taxonomyFieldAddr.'.toTaxonomyQuery(\''.$taxonomyBindings['textkey'].'\')',
                     'value' => '{{ structureItem.value }}',
                     'text'  => '{{ structureItem.text }}',
+                    'info'  => '{{ structureItem.info }}',
+                    'tag'  => '{{ structureItem.tag }}',
                 ];
             }
             // Fallback to user value ?

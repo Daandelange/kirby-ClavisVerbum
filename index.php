@@ -13,7 +13,7 @@ require_once(__DIR__ . '/src/TranslationHelper.php');
 
 const translatedStructureFieldName  = 'translatedstructure';
 
-App::plugin('daandelange/taxonomy', [
+App::plugin('daandelange/clavisverbum', [
     'options'      => require __DIR__.'/extensions/options.php',
 
     'fields' => [

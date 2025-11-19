@@ -38,6 +38,8 @@ class TaxonomyHelper {
     public static string $taxonomyStructureFieldName    = 'taxonomystructure';
     public static string $taxonomyStructureKeyFieldName = 'id';
     public static string $taxonomyStructureTextFieldName= 'text';
+    public static string $taxonomyStructureInfoFieldName= 'info';
+    public static string $taxonomyStructureIconFieldName= 'icon';
     public static string $taxonomyBindingsPropName      = 'taxonomybindings';
 
     // Static var to pass variables between different fields
@@ -94,18 +96,25 @@ class TaxonomyHelper {
         if(is_string($taxonomyBindings)) $taxonomyBindings = ['field'=>$taxonomyBindings];
 
         // Ensure correct blueprint setup
-        if( count($taxonomyBindings) < 1 || !isset($taxonomyBindings['field']) || empty($taxonomyBindings['field']) ){
+        if( count($taxonomyBindings) <= 0 || !isset($taxonomyBindings['field']) || empty($taxonomyBindings['field']) ){
             if($allowThrow)
                 throw new InvalidArgumentException('If using "taxonomybindings", please provide at least a "field" property.');
             else
                 return null;
         }
-        // Sanitize text and value keys
+        
+        // Sanitize text, value, info and tag keys
         if( !isset($taxonomyBindings['textkey'])  || !is_string($taxonomyBindings['textkey' ]) ){
             $taxonomyBindings['textkey']  = taxonomyHelper::$taxonomyStructureTextFieldName;
         }
         if( !isset($taxonomyBindings['valuekey']) || !is_string($taxonomyBindings['valuekey']) ){
             $taxonomyBindings['valuekey'] = taxonomyHelper::$taxonomyStructureKeyFieldName;
+        }
+        if( !isset($taxonomyBindings['infokey']) || !is_string($taxonomyBindings['infokey']) ){
+            $taxonomyBindings['infokey'] = taxonomyHelper::$taxonomyStructureInfoFieldName;
+        }
+        if( !isset($taxonomyBindings['iconkey']) || !is_string($taxonomyBindings['iconkey']) ){
+            $taxonomyBindings['iconkey'] = taxonomyHelper::$taxonomyStructureIconFieldName;
         }
 
         // Todo: Append custom fields and separate text, value fields ?
@@ -329,4 +338,64 @@ class TaxonomyHelper {
         return false;
     }
 
+    // Prepares the native columns
+    public static function filterTranslatedStructureColumnsProps(array $columns, array $translatedFields, bool $showDefaultLangOnly=true, bool|array $hideFields=false, string $previewLabel='', string $shortLabel='{{ field.label }}') : array {
+        if(empty($shortLabel)){
+            $shortLabel = $previewLabel;
+        }
+
+        // Adapt data (filter out fields for preview)
+        foreach($columns as $key=>$column){
+            // Grab field props
+            $field = $translatedFields; // Fixme: can throw when internal state not in sync !
+            if(is_array($field)){
+                // Remove key preview ?
+                // $hideFields = $this->hiddenpreviewfields();
+                if($hideFields !== false && is_array($hideFields) && !empty($hideFields)){
+                    if(in_array($key, $hideFields)){
+                        unset($columns[$key]);
+                        continue;
+                    }
+                }
+
+                // Only act on our own flagged data
+                if( isset($field['istranslatedfield']) && $field['istranslatedfield']===true ){
+                    // Reset field to original label (for usage by template strings)
+                    $field['label'] = $field['labelorig']??$field['label'];
+
+                    // Remove alt languages from preview columns
+                    if($showDefaultLangOnly){
+                        if(isset($field['isdefaultlang'])){
+
+                            // Remove col ?
+                            if($field['isdefaultlang']===false){
+                                unset($columns[$key]);
+                                continue;
+                            }
+                            // Remove language from label
+                            else {
+                                $columns[$key]['label'] = \Kirby\Toolkit\Str::template(
+                                    $shortLabel,
+                                    ['field'=>$field, 'language'=>kirby()->language($field['langcode']??null)],
+                                    ['fallback' => '-']
+                                );
+                                continue;
+                            }
+                        }
+                    }
+
+                    // Rename remaining columns
+                    if(!empty($previewLabel)){
+                        $columns[$key]['label'] = \Kirby\Toolkit\Str::template(
+                            $previewLabel,
+                            ['field'=>$field, 'language'=>kirby()->language($field['langcode']??null)],
+                            ['fallback' => '-']
+                        );
+                        continue;
+                    }
+                }
+            }
+        }
+        return $columns;
+    }
 }

@@ -3,7 +3,7 @@ import TaxonomyStructureField from "./TaxonomyStructureField.vue"
 import TaxonomyTagsField from "./TaxonomyTagsField.vue"
 // import KTaxonomyInput from "./TaxonomyInput.vue";
 
-panel.plugin("daandelange/taxonomy", {
+panel.plugin("daandelange/clavisverbum", {
   components: {
     'k-structure-field-mixin' : {
       extends: "k-structure-field",
