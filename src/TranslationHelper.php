@@ -5,7 +5,8 @@ namespace daandelange\Taxonomy;
 use \Daandelange\Helpers\BlueprintHelper;
 use \Daandelange\Helpers\FieldHelper;
 use \Kirby\Cms\App;
-
+use \Kirby\Toolkit\Str;
+use \Kirby\Toolkit\I18n;
 
 class TranslationHelper {
 
@@ -38,11 +39,11 @@ class TranslationHelper {
                     $fields[$colName]['translate']  = false; // Never translate as they are now duplicated
                     $fields[$colName]['name']       = $colName; // Must be same as key
 
+                    // Explicitly translate the field label
+                    $fields[$colName]['label']      = I18n::translate($field['label'], $field['label'], $lang->code());
                     // Apply templated label
-                    if(isset($field['istranslatedfield']) && $field['istranslatedfield']===true){
-                        $field['labelorig']  = $field['label'];
-                        $field['label']      = \Kirby\Toolkit\Str::template($duplicationLabel, ['field'=>$field, 'language'=>kirby()->language($field['langcode']??null)], ['fallback' => '-']); // Explicitly add the translation to the field
-                    }
+                    $fields[$colName]['labelorig']  = $fields[$colName]['label'];
+                    $fields[$colName]['label']      = Str::template($duplicationLabel, ['field'=>$fields[$colName], 'language'=>$lang], ['fallback' => '-']); // Explicitly add the translation to the field
 
                     // Apply required placeholder dynamically
                     if(isset($field['required']) && $field['required']==='defaultlang'){
@@ -52,6 +53,7 @@ class TranslationHelper {
                     // Set some extra convenience data
                     $fields[$colName]['istranslatedfield'] = true;
                     $fields[$colName]['isdefaultlang'] = $lang->isDefault();
+                    $fields[$colName]['iscurrentlang'] = $lang->is(App::instance()->language());
                     $fields[$colName]['langcode'] = $lang->code();
                 }
             }

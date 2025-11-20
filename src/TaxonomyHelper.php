@@ -18,6 +18,7 @@ use \Kirby\Cms\Page;
 
 use \Daandelange\Helpers\BlueprintHelper;
 use \Daandelange\Helpers\FieldHelper;
+use \Kirby\Cms\ModelWithContent;
 
 require_once(__DIR__.'/TaxonomyStructure.php');
 
@@ -36,11 +37,13 @@ class TaxonomyHelper {
     public static string $taxonomyTagsFieldName         = 'taxonomytags';
     public static string $translatedStructureFieldName  = 'translatedstructure';
     public static string $taxonomyStructureFieldName    = 'taxonomystructure';
+
+    // Taxonomy binding field keys
+    public static string $taxonomyBindingsPropName      = 'taxonomybindings';
     public static string $taxonomyStructureKeyFieldName = 'id';
     public static string $taxonomyStructureTextFieldName= 'text';
     public static string $taxonomyStructureInfoFieldName= 'info';
     public static string $taxonomyStructureIconFieldName= 'icon';
-    public static string $taxonomyBindingsPropName      = 'taxonomybindings';
 
     // Static var to pass variables between different fields
     private static array $taxonomyFieldsToUpdate        = [];
@@ -55,6 +58,21 @@ class TaxonomyHelper {
         return FieldHelper::nativeFieldFunction('structure', 'save', $structureField, null, $value);
     }
 
+    // Generates options from a taxonomybinding
+    public static function getFieldOptionsPropsFromTaxonomyBinding(array $taxonomyBindings) : ?array {
+        if (array_key_exists('field', $taxonomyBindings)) {
+            $taxonomyFieldAddr = $taxonomyBindings['field'];
+            return [
+                'type'  => 'query',
+                'query' => $taxonomyFieldAddr.'.toTaxonomyQuery(\''.$taxonomyBindings['textkey'].'\')',
+                'value' => '{{ structureItem.value }}',
+                'text'  => '{{ structureItem.text }}',
+                'info'  => '{{ structureItem.info }}',
+                'tag'  => '{{ structureItem.tag }}',
+            ];
+        }
+        return null;
+    }
     
     // Blueprint parsers / getters
     // public static function getFieldsBlueprintFromFormField(FormField $field) : ?array { // was: getFieldBlueprintsFromCmsField
@@ -339,15 +357,12 @@ class TaxonomyHelper {
     }
 
     // Prepares the native columns
-    public static function filterTranslatedStructureColumnsProps(array $columns, array $translatedFields, bool $showDefaultLangOnly=true, bool|array $hideFields=false, string $previewLabel='', string $shortLabel='{{ field.label }}') : array {
-        if(empty($shortLabel)){
-            $shortLabel = $previewLabel;
-        }
+    public static function filterTranslatedStructureColumnsProps(array $columns, array $translatedFields, bool|array $hideFields=false, string $previewLabel='') : array {
 
         // Adapt data (filter out fields for preview)
         foreach($columns as $key=>$column){
             // Grab field props
-            $field = $translatedFields; // Fixme: can throw when internal state not in sync !
+            $field = $translatedFields[$key]; // Fixme: can throw when internal state not in sync !
             if(is_array($field)){
                 // Remove key preview ?
                 // $hideFields = $this->hiddenpreviewfields();
@@ -363,27 +378,6 @@ class TaxonomyHelper {
                     // Reset field to original label (for usage by template strings)
                     $field['label'] = $field['labelorig']??$field['label'];
 
-                    // Remove alt languages from preview columns
-                    if($showDefaultLangOnly){
-                        if(isset($field['isdefaultlang'])){
-
-                            // Remove col ?
-                            if($field['isdefaultlang']===false){
-                                unset($columns[$key]);
-                                continue;
-                            }
-                            // Remove language from label
-                            else {
-                                $columns[$key]['label'] = \Kirby\Toolkit\Str::template(
-                                    $shortLabel,
-                                    ['field'=>$field, 'language'=>kirby()->language($field['langcode']??null)],
-                                    ['fallback' => '-']
-                                );
-                                continue;
-                            }
-                        }
-                    }
-
                     // Rename remaining columns
                     if(!empty($previewLabel)){
                         $columns[$key]['label'] = \Kirby\Toolkit\Str::template(
@@ -397,5 +391,16 @@ class TaxonomyHelper {
             }
         }
         return $columns;
+    }
+
+    // Resolves a taxonomy binding to its field
+    public static function resolveTaxonomyBindingField(ModelWithContent $model, array $taxonomyBinding) : ContentField {
+        $queryResult = $model->query($taxonomyBinding['field']);
+        
+        if(!$queryResult || $queryResult instanceof \Kirby\Content\Field === false || !$queryResult->exists()){
+            throw new \Kirby\Exception\LogicException("The taxonomy binding didn't return a valid structure field. Please correct the binding in the blueprint. binding.field=`{$taxonomyBinding['field']}`.");
+        }
+
+        return $queryResult;
     }
 }

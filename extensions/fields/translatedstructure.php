@@ -20,6 +20,28 @@ use \Kirby\Toolkit\A;
 // Note : This was observed in the context of another field that extends this one.
 $nativeStructureFieldBlueprint = require( kirby()->root('kirby').'/config/fields/structure.php' );
 
+// Trick to change the order of props&computed
+$nativeStructureFieldBlueprint = A::prepend( $nativeStructureFieldBlueprint, [
+    'props' => array_fill_keys([
+        // Simple props first !
+        'previewShowCurrentOnly',
+        'previewShowDefaultOnly',
+        'previewLabel',
+        'spreadlangsoverwidth',
+        
+        // And the more heavy ones
+        'fields',
+        'hiddenpreviewfields', // After fields, previewShow*Only, before columns !
+        'columns',
+        'default',
+        'value',
+    ], null),
+    'computed' => array_fill_keys([
+
+        //'columns',// put columns last
+    ], null),
+]);
+
 return A::append( $nativeStructureFieldBlueprint, [
     // Not needed as we use $nativeStructureFieldBlueprint
     //'extends' => 'structure',
@@ -56,7 +78,7 @@ return A::append( $nativeStructureFieldBlueprint, [
             return $fields;
         },
         
-        // Globar user fields parsing function
+        // Global user fields parsing function
         'parseFields' => function(array $userFields) : array{
             $userFields = $this->expandTranslateableFields($userFields);
             return $userFields;
@@ -84,7 +106,21 @@ return A::append( $nativeStructureFieldBlueprint, [
         // Always disable translations !
         'translate' => false,
 
-        // Fallback field when translations are empty
+        'previewShowCurrentOnly' => function(bool $value=true){
+            return $value;
+        },
+        'previewShowDefaultOnly' => function(bool $value=false){
+            return $value;
+        },
+        'previewLabel' => function(?string $value=null){
+            // Grab default from options
+            if(!$value){
+                return option('daandelange.taxonomy.preview.label', '{{ field.label }} / {{ language.code }}');
+            }
+            return $value;
+        },
+
+        // Fallback field when translations are empty (todo!)
         'translationfallback' => function(string $value=''){
             if($value=='defaultlang') return $value;
             return $value;
@@ -105,7 +141,24 @@ return A::append( $nativeStructureFieldBlueprint, [
         },
         // Explicit fields to remove from the preview columns
         'hiddenpreviewfields' => function(array $value=[]){
-            return $value;
+            // Inject from other props/options
+            $showDefaultLangOnly = $this->previewShowDefaultOnly();
+            $showCurrentLangOnly = $this->previewShowCurrentOnly();
+            // Note: taxonomystructure prop !
+
+            // Remove alt languages as per settings
+            $extraFields=[];
+            if($showCurrentLangOnly || $showDefaultLangOnly){
+                foreach($this->fields() as $field){
+                    if($field['istranslatedfield']==true){
+                        if(($showCurrentLangOnly && $field['iscurrentlang']) || ($showDefaultLangOnly && $field['isdefaultlang'])){
+                            continue; // keep field
+                        }
+                        $extraFields[] = $field['name'];
+                    }
+                }
+            }
+            return A::append($value, $extraFields);
         },
     ],
     'validations' => [
@@ -145,15 +198,15 @@ return A::append( $nativeStructureFieldBlueprint, [
                 return $columns;
             }
 
-            // // Adapt data (filter out fields for preview)
+            // Adapt data (filter out fields for preview)
             $columns = TaxonomyHelper::filterTranslatedStructureColumnsProps(
                 $columns,
                 $this->fields,
-                option('daandelange.taxonomy.preview.showDefaultOnly', true),
                 $this->hiddenpreviewfields(),
-                option('daandelange.taxonomy.preview.longLabel', '{{ field.label }} / {{ language.code }}'),
-                option('daandelange.taxonomy.preview.shortLabel', '{{ field.label }}')
+                $this->previewLabel(),
             );
+            $tmp2 = $this->hiddenpreviewfields;
+            $tmp = $this->hiddenpreviewfields();
             return $columns;
         },
     ],
@@ -171,3 +224,4 @@ return A::append( $nativeStructureFieldBlueprint, [
     ],
     // Todo: autotranslate toStructure() ?
 ]);
+return $ret;

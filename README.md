@@ -37,15 +37,11 @@ You can change the plugin behaviour using the following options :
 
 ````php
 return [
-    // Show default language fields only in preview columns
-    'preview.showDefaultOnly' => true, // bool
     // Field names to hide from the preview columns
     'preview.hideFields' => false, // false | array
-    // The label of a field preview. Template args: `field` and `language`.
-    'preview.longLabel' => '{{ field.label }} / {{ language.code }}',
-    // The label of a field preview without language. Template args: `field` and `language`. Only when showDefaultOnly=true.
-    'preview.shortLabel' => '{{ field.label }}',
-    // The label of a newly duplicated field. Template args: `field` and `language`
+    // The label of a field preview. Template args: `field` and `language`. Global scope, can be overridden by blueprint
+    'preview.label' => '{{ field.label }} / {{ language.code }}',
+    // The label of a newly duplicated field. Template args: `field` and `language`. Global scope, can be overridden by blueprint
     'field.duplicationLabel' => '{{ field.label }} / {{ language.name }}',
 ];
 ````
@@ -76,6 +72,14 @@ Note: _Some defaults have been changed for convenience._
             # Field names to remove from the preview column
             hiddenpreviewfields: # default=[]
                 - myfieldname
+            # Show all languages of a field on one line ?
+            spreadlangsoverwidth: true # default=false
+            # Show default language fields only in preview columns.
+            previewShowDefaultOnly: true # default=false
+            # Show current language fields only in preview columns.
+            previewShowCurrentOnly: false # default=true
+            # The label of a newly duplicated fields. Template args: `field` and `language`.
+            previewLabel: '{{ field.label }} / {{ language.code }}' # default=as-example
             # Your regular fields with extra props
             fields:
                 somefield:
@@ -84,12 +88,15 @@ Note: _Some defaults have been changed for convenience._
                     # The required prop can be set to `defaultlang`
                     # which will require a value only for the default language
                     required: defaultlang # default=false
-                    # Show all languages on one line ?
-                    spreadlangsoverwidth: true #default=false
                     # Don't allow duplicate entries for this field (for the panel field validator on save)
                     unique: true #default=false
                     # Todo:
-                    translationfallback: defaultLang # a field name or '' to use if no translation is available.
+                    #translationfallback: defaultLang # a field name or '' to use if no translation is available.
+                    # The label can be array, static strings or even a translation variable. (see also options.field.duplicationLabel)
+                    label:
+                        en: Some field
+                        fr: Un champ
+
 
 ```
 

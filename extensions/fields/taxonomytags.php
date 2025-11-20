@@ -10,6 +10,8 @@ use \Kirby\Toolkit\Str;
 use \Kirby\Exception\InvalidArgumentException;
 use \Kirby\Field\FieldOptions;
 use \Daandelange\Helpers\BlueprintHelper;
+use Daandelange\Helpers\FieldHelper;
+
 
 // A tags-field that uses a hidden structure to populate itself
 // Todo: Since 3.8.2, some sanitising is natively embedded, maybe some code has become obsolete ?
@@ -18,13 +20,13 @@ return [
     // !!! Available only on Kirby\Form\Field objects, not in Kirby\Cms\Field
     'methods' => [
         // Override this to parse the options. At least needed to ensure keys are slugs when the content file is manually edited.
-        'getOptions' => function () {
+        // Note: Called by options.computed.options (in compute stage: converts query options to expanded)
+        'getOptions' => function () : array {
             // Original func from config/fields/mixins/options.php
             $props   = FieldOptions::polyfill($this->props); // Standardize options (with old APIs?)
             if(!isset($props['options']['info'])) $props['options']['info']='{{ structureItem.info }}';
             if(!isset($props['options']['icon'])) $props['options']['icon']='tag';
             $options = FieldOptions::factory($props['options']);
-
             $options = $options->render($this->model());
 
             foreach($options as $i => $option){
@@ -34,42 +36,9 @@ return [
             }
             return $options;
         },
-        'getTaxonomyBindingsOld' => function(): ?array {
-            return TaxonomyHelper::getTaxonomyBindingsFromFormField($this);
-        },
-        'getBoundStructureFieldCms' => function( ) : \Kirby\Content\Field {
-            $tagsField = $this; // Form/Field
-            $taxonomyBinding = TaxonomyHelper::getTaxonomyBindingsFromFormField($tagsField);
-            if(!$taxonomyBinding){
-                throw new \Exception("Taxonomy bindings empty, please configure the taxonomybinding in your blueprint to enable the Add Tag function.");
-            }
-            
-            $structureCmsField = $tagsField->model()->query($taxonomyBinding['field']);
-
-            if(!$structureCmsField || $structureCmsField instanceof \Kirby\Content\Field === false || !$structureCmsField->exists()){
-                throw new \Kirby\Exception\Exception("The taxonomy binding didn't return a valid structure field. Please correct the binding in the blueprint.");
-            }
-
-            return $structureCmsField;
-        },
-        'getBoundStructureField' => function( ) : \Kirby\Form\Field {
-            $structureCmsField = $this->getBoundStructureFieldCms();
-            $structureFieldBlueprint = BlueprintHelper::getFieldBlueprint($structureCmsField, true);
-
-            // Secure
-            if(!in_array($structureFieldBlueprint['type'], ['taxonomystructure', 'structure'])){
-                throw new \Exception("The taxonomy binding does not point to a structure field !");
-            }
-            
-            $structureFieldBlueprint['model'] = $structureCmsField->model();
-            $structureFieldBlueprint['value'] = $structureCmsField->value();
-            $structureFieldBlueprint['key'] = $structureCmsField->key();
-
-            // WARNING: every call builds a new form field... How to grab it from pages ?
-            $structureFormField = \Kirby\Form\Field::factory($structureFieldBlueprint['type'], $structureFieldBlueprint);
-
-            return $structureFormField;
-        },
+        // 'getTaxonomyBindingsOld' => function(): ?array {
+        //     return TaxonomyHelper::getTaxonomyBindingsFromFormField($this);
+        // },
         'getTaxonomyTextKeyForLang' => function(?\Kirby\Cms\Language $lang=null, ?string $baseTextKey=null ): ?string {
             // return TaxonomyHelper::getTaxonomyTextKeyForLang($this->getTaxonomyBindings(), $lang);
             return TaxonomyHelper::getTaxonomyTextKeyForLang(TaxonomyHelper::getTaxonomyBindingsFromFormField($this), $lang);
@@ -80,6 +49,9 @@ return [
         },
 
         // Copy of native function, used to fill data
+        // Note: first Kirby parses all props+computed, then $field->fill() triggers prop.value and runs all computed again.
+        // Note: BUT attrs, methods, options and type cannot be changed during 2nd stage.
+        // toValues() is called multiple times during these stages, for default value and filled value (from storage or on panel save)
         'toValues' => function ($value) {
             if (is_null($value) === true) {
                 return [];
@@ -105,83 +77,88 @@ return [
     ],
     'computed' => [
         // Returns the bound taxonomy form, for adding data like the native structure field
-        'form' => function(){
-            $structureFormField = $this->getBoundStructureField();
+        'form' => function() : array {
+            $structureFormField = $this->boundStructureFormField();
             return $structureFormField->form();
         },
-        'fields' => function () : array {
-            $structureFormField = $this->getBoundStructureField();
-            return $structureFormField->fields();
-            if (empty($this->fields) === true) {
-                throw new \Exception('Please provide some fields for the structure');
-            }
-
-            return $this->form()->fields()->toArray();
-        },
         'taxonomyEndpoint' => function() : string {
-            //$structureFormField = $this;
-            $structureFormField = $this->getBoundStructureFieldCms();
-            //return "";
+            $structureFormField = $this->boundStructureContentField();
             return $structureFormField->model()->apiUrl(true).'/fields/'.$structureFormField->key();
         },
         // The panel link to the origina taxonomy structure field
         'taxonomyEditUrl' => function() : string {
-            $structureFormField = $this->getBoundStructureFieldCms();
+            $structureFormField = $this->boundStructureContentField();
             return $structureFormField->model()?->panel()->path()??'';
         },
         // If the taxonomy struct is on the same model (different panel behaviour)
         'taxonomyIsOnSameModel' => function() : bool {
-            // Note: $this = Form\Field
-            $structureCmsField = $this->getBoundStructureFieldCms();
+            $structureCmsField = $this->boundStructureContentField();
             return $structureCmsField && ($structureCmsField?->model() == $this->model());
         },
+        // todo: remove in favour of reading from the (resolved?) taxonomybinding ! 
+        // todo: too late to have this in computed ?
         'structureFieldName' => function() : string {
-            $structureCmsField = $this->getBoundStructureFieldCms();
+            $structureCmsField = $this->boundStructureContentField();
             return $structureCmsField?->key()??'';
         },
-        'keyfieldname' => function(){
+        'keyfieldname' => function() : string {
             return TaxonomyHelper::$taxonomyStructureKeyFieldName;
         },
     ],
+    // Important to have the props in the correct order, so it's fetched first !
     'props' => [
-        'fields' => function (array $fields=[]) { // For structure functionality
-            $structureFormField = $this->getBoundStructureField();
+        TaxonomyHelper::$taxonomyBindingsPropName => function (?array $value = null) : ?array {
+            // If they are needed earlier, try using : TaxonomyHelper::getTaxonomyBindingsFromFormField($this);
+            return TaxonomyHelper::ParseTaxonomyBindings($value);
+        },
+        'boundStructureContentField' => function($value=null) : ?\Kirby\Content\Field {
+            /** @var Kirby/Form/Field $this */
+            $taxonomyBinding = $this->taxonomybindings(); // Warning! Requires `taxonomybindings` prop to be inited !
+            // $taxonomyBinding = TaxonomyHelper::getTaxonomyBindingsFromFormField($tagsField); // Otherwise use this
+            if(!$taxonomyBinding){
+                throw new \Exception("Taxonomy bindings empty, please configure the taxonomybinding in your blueprint to enable the Add Tag function.");
+            }
+            
+            $structureCmsField = TaxonomyHelper::resolveTaxonomyBindingField($this->model(), $taxonomyBinding);
+            return $structureCmsField;
+        },
+        'boundStructureFormField' => function($value=null) : ?\Kirby\Form\Field {
+            $structureCmsField = $this->boundStructureContentField();
+            $structureFormField = FieldHelper::getFormFieldFromCmsField($structureCmsField);
+            
+            // Secure
+            if(!in_array($structureFormField->type(), ['taxonomystructure', 'structure'])){
+                throw new \Exception("The taxonomy binding does not point to a structure field !");
+            }
+            
+            return $structureFormField;
+        },
+        'fields' => function (array $fields=[]) : array { // For structure functionality
+            $structureFormField = $this->boundStructureFormField();
             return $structureFormField->fields();
         },
         'type'  => TaxonomyHelper::$taxonomyTagsFieldName,
-        'options' => function ($options = []) {
+        // Fixme: options is an overridden prop (first in props order) but needs to be parsed after taxonomybindings !!??
+        // Move to computed ???
+        'options' => function (array|string $options = []) : array {
             // Simply over-ride the value when taxonomybindings are enabled
-            // $taxonomyBindings = $this->getTaxonomyBindings();
-            $taxonomyBindings = TaxonomyHelper::getTaxonomyBindingsFromFormField($this);
-            if ($taxonomyBindings) {
-                $taxonomyFieldAddr = $taxonomyBindings['field'];
-                $fallbackField = $taxonomyBindings['valuekey'];
-                return [
-                    'type'  => 'query',
-                    'query' => $taxonomyFieldAddr.'.toTaxonomyQuery(\''.$taxonomyBindings['textkey'].'\')',
-                    'value' => '{{ structureItem.value }}',
-                    'text'  => '{{ structureItem.text }}',
-                    'info'  => '{{ structureItem.info }}',
-                    'tag'  => '{{ structureItem.tag }}',
-                ];
+            $taxonomyBindings = $this->taxonomybindings()??[];
+            $taxonomyOptions = TaxonomyHelper::getFieldOptionsPropsFromTaxonomyBinding($taxonomyBindings);
+            if ($taxonomyOptions) {
+                return $taxonomyOptions;
             }
-            // Fallback to user value ?
+            // Fallback to user provided value ?
             return $options;
         },
-        'translate' => function ($translate = false) {
+        'translate' => function (bool $translate = false) : bool {
             // Note: setting translate=false here, the panel seems to still enable it in the panel BUT not allow saving :o
             return false;
         }, // Revert translation to false by default. Might cause attr/props issues ?
         //'disabled' => false, // Enable panel in all languages, so it remains editable. Sent value will be ignored.
-        'counter' => function ($counter = false) { return $counter; }, // false by default
-        'accept' => function ($accept = 'all') {
-            //return 'all'; // All enables writing new categories
+        'counter' => function (bool $counter = false) : bool { return $counter; }, // false by default
+        'accept' => function (?string $accept = null) : string {
             return 'options';  // Restricts $accept to "options". Todo: change this.
         },
-        'taxonomybindings' => function (?array $value = null) {
-            // If they are needed earlier, try using : TaxonomyHelper::getTaxonomyBindingsFromFormField($this);
-            return TaxonomyHelper::ParseTaxonomyBindings($value);
-        }
     ],
     // Api endpoint for updating the parent field ?
     'api' => function () {
@@ -195,24 +172,27 @@ return [
                     
                     // Todo: exit early when data is empty ?
                     $tagData = $this->requestBody();
-                    //$tagData = ['id'=>'testadd','name_fr'=>'Testing Add'];
                     if(empty($tagData) || empty($tagData['newTag'])) return [
                         'status'    => 'error',
                         'label'     => 'Data Error',
-                        'message'   => 'Cannot add tag without any data!',
+                        'message'   => 'Cannot add tag without any data!', // todo: translateme !
                         'code'      => 200,
                     ];
                     $tagData = $tagData['newTag'];
 
-                    // Todo: auth ?
+                    // Todo: auth / permissions ?
                     // if (kirby()->user() && kirby()->user()->isAdmin()) {
 
-                    try {
-                        // We only update in the default language as the field is never translated
-                        $defaultLang = $this->kirby()->defaultLanguage()->code();
+                    // We only update in the default language as the field is never translated
+                    $defaultLang = $this->kirby()->defaultLanguage()->code();
+                    $currentLang = $this->kirby()->language()->code();
+                    if($defaultLang != $currentLang){
+                        throw new \Kirby\Exception\LogicException("You can't add tags from another language !");
+                    }
 
+                    try {
                         // Grab taxonomy structure binding
-                        $structureFormField = $this->field()->getBoundStructureField();
+                        $structureFormField = $this->field()->boundStructureFormField();
                         
                         if(isset($structureFieldBlueprint['type']) && !in_array($structureFieldBlueprint['type'],[ 'taxonomystructure'])){
                             throw new \LogicException("The resulting query is not a taxonomystructure field !");
@@ -245,7 +225,7 @@ return [
                                 'code'      => 200,
                                 'errors'    => [
                                     'label'     => 'Duplicate ID',
-                                    'message'   => "The tag ID already exists, please choose another one.",
+                                    'message'   => 'The tag ID `'.$data['id'].'`already exists, please choose another one.',
                                 ],
                             ];
                         };
@@ -257,7 +237,6 @@ return [
                         $updatedPage = $structureFormField->model()->save([ $structureFormField->key() => $structureValues ], $defaultLang, false);
 
                         // Convert newly added data to tag options
-                        //$newOptions = \Kirby\Option\OptionsQuery::factory($structureFormField->query())->resolve($structureValues);
                         // array_values = Ensure to stay an array when transmitted to the panel
                         $newOptions = array_values($updatedPage->{$structureFormField->key()}()->toTaxonomyQuery()->toArray()); 
                         
@@ -268,7 +247,7 @@ return [
                                 break;
                             }
                         }
-                        $modelsAreSame = $structureFormField->model() == $this->field()->model();
+                        //$modelsAreSame = $structureFormField->model() == $this->field()->model();
 
                         return [
                             'status'    => 'success',
