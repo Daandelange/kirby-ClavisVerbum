@@ -11,12 +11,38 @@ use \Kirby\Exception\InvalidArgumentException;
 use \Kirby\Field\FieldOptions;
 use \Daandelange\Helpers\BlueprintHelper;
 use Daandelange\Helpers\FieldHelper;
-
+use \Kirby\Toolkit\A;
 
 // A tags-field that uses a hidden structure to populate itself
-// Todo: Since 3.8.2, some sanitising is natively embedded, maybe some code has become obsolete ?
-return [
-    'extends' => 'tags',
+
+// Sorry for the mess below, this is the best way I found to extend these native fields.
+// Load native field
+$kr = kirby()->root('kirby');
+$nativeStructureFieldBlueprint = require( $kr.'/config/fields/tags.php');
+// Prioritize own options
+$nativeStructureFieldBlueprint = A::prepend($nativeStructureFieldBlueprint, ['props'=>array_fill_keys([
+    // Keys to prepend in a specific order
+    TaxonomyHelper::$taxonomyBindingsPropName,
+    'boundStructureContentField',
+    'boundStructureFormField',
+    'options',
+    'fields',
+], null)]);
+// Oh gosh ! --> mixin.props.xyz are always placed before plugin.props.abc
+$nativeOptionsMixin = require( $kr.'/config/fields/mixins/options.php');
+// Manually mix the tags field
+if(array_key_exists('mixins', $nativeStructureFieldBlueprint) && is_array($nativeStructureFieldBlueprint['mixins'])){
+    // Remove 
+    $nativeStructureFieldBlueprint['mixins']=array_filter($nativeStructureFieldBlueprint['mixins'], function($item){
+        return $item!='options';
+    });
+}
+// Mix in options
+$nativeStructureFieldBlueprint = A::append($nativeStructureFieldBlueprint, $nativeOptionsMixin);
+
+
+return A::append($nativeStructureFieldBlueprint, [
+    //'extends' => 'tags',
     // !!! Available only on Kirby\Form\Field objects, not in Kirby\Cms\Field
     'methods' => [
         // Override this to parse the options. At least needed to ensure keys are slugs when the content file is manually edited.
@@ -77,7 +103,7 @@ return [
     ],
     'computed' => [
         // Returns the bound taxonomy form, for adding data like the native structure field
-        'form' => function() : array {
+        'form' => function() : Form {
             $structureFormField = $this->boundStructureFormField();
             return $structureFormField->form();
         },
@@ -139,10 +165,9 @@ return [
         },
         'type'  => TaxonomyHelper::$taxonomyTagsFieldName,
         // Fixme: options is an overridden prop (first in props order) but needs to be parsed after taxonomybindings !!??
-        // Move to computed ???
         'options' => function (array|string $options = []) : array {
             // Simply over-ride the value when taxonomybindings are enabled
-            $taxonomyBindings = $this->taxonomybindings()??[];
+            $taxonomyBindings = $this->taxonomybindings()??[]; // <-- fixme: called before the prop is ready. Will return the attr value (from user blueprint) instead of the prop'ed value
             $taxonomyOptions = TaxonomyHelper::getFieldOptionsPropsFromTaxonomyBinding($taxonomyBindings);
             if ($taxonomyOptions) {
                 return $taxonomyOptions;
@@ -275,4 +300,4 @@ return [
             ]
         ];
     },
-];
+]);
