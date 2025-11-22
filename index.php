@@ -29,10 +29,10 @@ App::plugin('daandelange/clavisverbum', [
 
     'fieldMethods' => [
         // Easily parse tags from the frontend !
-        'toTaxonomy' => function(ContentField $tagsField/*, bool $returnAllOptions = false*/) : ?array {
-            $tags = TaxonomyHelper::getTagsFromCmsField($tagsField, /*$returnAllOptions ? TaxonomyItemGetterMode::TAXONOMY_OPTIONS :*/ TaxonomyItemGetterMode::SANITIZED_TAGS );
-            return $tags;
-        },
+        // 'toTaxonomy' => function(ContentField $tagsField/*, bool $returnAllOptions = false*/) : ?array {
+        //     $tags = TaxonomyHelper::getTagsFromCmsField($tagsField, /*$returnAllOptions ? TaxonomyItemGetterMode::TAXONOMY_OPTIONS :*/ TaxonomyItemGetterMode::SANITIZED_TAGS );
+        //     return $tags;
+        // },
         // Custom export-as-tags function for usage in API/Template
         // Cannot be in field.methods because that seems to only be available in the panel, not in the cms/api/template namespace
         'toTaxonomyQuery' => require __DIR__.'/extensions/fieldmethods/toTaxonomyQuery.php', // todo: remove ?

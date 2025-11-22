@@ -264,7 +264,7 @@ class TaxonomyHelper {
         if(!($taxonomyStructureCmsField instanceof ContentField)){
             throw new InvalidArgumentException('getTagsQueryFromCmsField : the field argument #0 is not a Kirby\Content\Field !');
         }
-        // Might be unneccessary, but virtual fields are untested, so throw.
+        // Might be unnecessary, but virtual fields are untested, so throw.
         if(!$taxonomyStructureCmsField->exists()){
             throw new InvalidArgumentException("getTagsQueryFromCmsField: The provided field \"".$taxonomyStructureCmsField->name()."\" does not exist in the content and blueprint, it's probably a virtual field ! (unsupported)");
         }
