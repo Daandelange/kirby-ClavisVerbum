@@ -33,9 +33,9 @@ export default {
 			//'add',
 			'open',
 			//'form',
-			//'options',
+			'options',
 			'removeAll',
-			'remove'
+			'remove',
 		]);
 		//window.console.log(this.$refs.options);
 		//window.console.log("OK!");
@@ -77,6 +77,10 @@ export default {
 			if(this.allowremove || this.$helper.string.isEmpty(item[this.keyfieldname??'id'])){ // Allow removing empty key (new entry not yet saved)
 				this.removeNative(item);
 			}
+			// Close the drawer
+			else {
+				this.close();
+			}
 		},
 		removeAllCustom(){
 			if(this.allowremove){
@@ -84,7 +88,7 @@ export default {
 			}
 		},
 		// Dropdown menu action callback
-		optionCustom(option, row){
+		optionsCustom(option, row){
 			if(this.duplicate==false && option=="duplicate"){
 				return;
 			}
@@ -93,7 +97,7 @@ export default {
 		// Manual copy of native.computed.options
 		optionsNative(){
 			if (this.disabled) {
-			return [];
+				return [];
 			}
 
 			return [

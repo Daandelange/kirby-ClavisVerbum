@@ -15,10 +15,13 @@ use \Kirby\Cms\Blueprint;
 use \Kirby\Cms\Language;
 use \Kirby\Cms\Structure;
 use \Kirby\Cms\Page;
+use \Kirby\Cms\ModelWithContent;
+use \Kirby\Data\Data;
+use \Exception;
 
 use \Daandelange\Helpers\BlueprintHelper;
 use \Daandelange\Helpers\FieldHelper;
-use \Kirby\Cms\ModelWithContent;
+use \Daandelange\Taxonomy\TranslatedStructure;
 
 require_once(__DIR__.'/TaxonomyStructure.php');
 
@@ -339,6 +342,79 @@ class TaxonomyHelper {
 
         $structure = Structure::factory($tags, ['parent' => $taxonomyStructureCmsField->model(), 'field' => $taxonomyStructureCmsField]);
         return $structure;//new Structure($tags);
+        
+    }
+
+    // like native toStructure
+    public static function getTranslatedStructureFromContentField(ContentField $translatedStructureField) : TranslatedStructure {
+        try {
+            return TranslatedStructure::factory(
+                Data::decode($translatedStructureField->value, 'yaml'),
+                ['parent' => $translatedStructureField->parent(), 'field' => $translatedStructureField]
+            );
+        } catch (Exception) {
+            $message = 'Invalid translatedstructure data for "' . $translatedStructureField->key() . '" field';
+    
+            if ($parent = $translatedStructureField->parent()) {
+                $message .= ' on parent "' . $parent->id() . '"';
+            }
+    
+            throw new InvalidArgumentException(
+                message: $message
+            );
+        }
+    }
+
+    // Value parsing utility for providing/forcing a fallback to the default translation
+    public static function fieldContentNeedsDefaultLangTranslation(ContentField | FormField $field) : bool {
+        return (
+            // Single lang has normal behaviour
+            $field->kirby()->multilang() &&
+            // ContentField model can be null !!
+            $field->model() &&
+            // Default lang has normal behaviour.
+            !$field->model()->translation()->language()->isDefault() // &&
+            // if attrs.translate is explicitly set to false (fixme: or always?)
+            //( $taxonomyStructureField->translate() === false )
+        );
+    }
+
+    //
+    public static function getTaxonomyStructureFromContentField(ContentField $taxonomyStructureField) : TaxonomyStructure {
+        
+        // TODO
+        // Force content from default language
+        if(TaxonomyHelper::fieldContentNeedsDefaultLangTranslation($taxonomyStructureField)){
+            // Force-use translated version (never use alt language content)
+            $translatedValue = static::getDefaultTranslationValueFromContentField($taxonomyStructureField);
+
+            $taxonomyStructureField = $taxonomyStructureField->value($translatedValue);
+        }
+
+        // Get sanitized data
+        $data = Data::decode($taxonomyStructureField->value, 'yaml');
+        if(!is_array($data)){ // only accept arrays
+            $data=[];
+        }
+
+        // Like original toStructure
+        try {
+            return TaxonomyStructure::factory(
+                $data,
+                ['parent' => $taxonomyStructureField->parent(), 'field' => $taxonomyStructureField]
+            );
+        } catch (Exception $e) {
+            $message = 'Invalid taxonomystructure data for "' . $taxonomyStructureField->key() . '" field';
+    
+            if ($parent = $taxonomyStructureField->parent()) {
+                $message .= ' on parent "' . $parent->id() . '"';
+            }
+    
+            throw new InvalidArgumentException(
+                message: $message,
+                details: [$e->getMessage()]
+            );
+        }
     }
 
     // Afterpage hook for updating cached field values in the default lang from another lang. To prevent triggering save many times, just stack-up changes and apply them once manually to bypass core translation logic.
@@ -402,5 +478,70 @@ class TaxonomyHelper {
         }
 
         return $queryResult;
+    }
+
+    // Helps consolidate translatedstructure inner fields props
+    // Todo: move to taxonomyhelper ?
+    public static function sanitizeTranslatedStructureFieldsProps(array $fields) : array {
+        // Apply some extra sanitisations
+        foreach($fields as &$field){
+            // Enforce unique
+            $field['unique'] = $field['unique'] ?? false;
+
+            // These have triggered some Kirby structure field errors for not being explicitly set
+            $field['hidden'] = $field['hidden']??false;
+            $field['saveable'] = $field['saveable']??true;
+
+            // Split over width (aka all languages on one line)
+            if( $field['spreadlangsoverwidth']??false ){
+                $field['width'] = '1/'.kirby()->languages()->count();
+            }
+        }
+
+        return $fields;
+    }
+
+    // Helps consolidate translatedstructure inner field props : enforce minimum fields (ID+another)
+    public static function parseTaxonomyStructureFields(array $fields=[]) : array {
+        // Backup & Delete user key field
+        $userKeyField = $fields[TaxonomyHelper::$taxonomyStructureKeyFieldName] ?? [];
+        //unset($customFields[TaxonomyHelper::$taxonomyStructureKeyFieldName]);
+        
+        // If not provided, prepend ID, otherwise keep user provided position
+        if(!array_key_exists(TaxonomyHelper::$taxonomyStructureKeyFieldName, $fields)){
+            $fields = [TaxonomyHelper::$taxonomyStructureKeyFieldName=>[]] + $fields;
+        }
+
+        // Inject or replace ID field
+        $fields[TaxonomyHelper::$taxonomyStructureKeyFieldName] = [ 
+            'type'  => 'slug', // Provides out-of-the box sanitization (UI only!)
+            'name'  => TaxonomyHelper::$taxonomyStructureKeyFieldName,
+            'label' => $userKeyField['label']??'ID', // Allow changing the ID
+            'icon'  => $userKeyField['icon']??'tag', // Allow changing the icon
+            'translate' => false, // Never translate the id.
+            //'disabled' => true, // Not possible, also disables it in add function !!! Would be nice to disable editing somehow.
+            'required' => true, // Always require ID
+            'minlength' => $userKeyField['minlength'] ?? 2,
+            'maxlength' => $userKeyField['maxlength'] ?? 32,
+            'unique' => true, // Custom unique validator flag
+            //'sync' => TaxonomyHelper::$taxonomyStructureKeyFieldName.((kirby()->multilang() && kirby()->languages()->count() > 1)?'_'.kirby()->defaultLanguage()->code():''), // Sync slug with default lang title
+            'sync' => TaxonomyHelper::$taxonomyStructureKeyFieldName.'_'.kirby()->defaultLanguage()->code(), // Sync slug with default lang title
+            'mobile' => true, // Always visible on mobile
+            'disabled' => true, // prevent editing
+        ];
+
+        // Add default "name" field if no fields are provided
+        if(count($fields) <= 1){
+            $customFields[TaxonomyHelper::$taxonomyStructureTextFieldName]=[
+                'type'  => 'text',
+                'name'  => TaxonomyHelper::$taxonomyStructureTextFieldName,
+                'label' => 'Name',
+                'required' => true, // Custom naming convention, to be documented
+                //'hidden' => false, // Prevents undefined array key "hidden" in native structurefield
+                'translate' => true,
+            ];
+        }
+
+        return $fields;
     }
 }

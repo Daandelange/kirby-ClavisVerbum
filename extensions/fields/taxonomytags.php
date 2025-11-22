@@ -10,7 +10,7 @@ use \Kirby\Toolkit\Str;
 use \Kirby\Exception\InvalidArgumentException;
 use \Kirby\Field\FieldOptions;
 use \Daandelange\Helpers\BlueprintHelper;
-use Daandelange\Helpers\FieldHelper;
+use \Daandelange\Helpers\FieldHelper;
 use \Kirby\Toolkit\A;
 
 // A tags-field that uses a hidden structure to populate itself

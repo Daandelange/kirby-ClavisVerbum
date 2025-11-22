@@ -38,7 +38,7 @@ return A::append( $translatedStructureFieldBlueprint, [
     'methods' => [
         'parseFields' => function(array $userFields) : array {
             // Inject the minimum required fields
-            $fields = BlueprintHelper::parseTaxonomyStructureFields($userFields);
+            $fields = TaxonomyHelper::parseTaxonomyStructureFields($userFields);
 
             // Expand with translations
             $fields = $this->expandTranslateableFields($fields);

@@ -3,10 +3,14 @@
 namespace daandelange\Taxonomy;
 
 use \Daandelange\Helpers\BlueprintHelper;
-use \Daandelange\Helpers\FieldHelper;
+// use \Daandelange\Helpers\FieldHelper;
 use \Kirby\Cms\App;
 use \Kirby\Toolkit\Str;
 use \Kirby\Toolkit\I18n;
+use \Kirby\Cms\ModelWithContent;
+use \Kirby\Exception\InvalidArgumentException;
+use \Kirby\Content\Field as ContentField;
+use \Kirby\Form\Field as FormField;
 
 class TranslationHelper {
 
@@ -66,6 +70,48 @@ class TranslationHelper {
             }
         }
         return $fields;
+    }
+
+    //
+    public static function getDefaultTranslationValueFromContentField(ContentField $field) : mixed {
+        $key = $field->key();
+        $model = $field->model();
+        if(!$model || !($model instanceof ModelWithContent)){
+            throw new InvalidArgumentException(message:'The field `'.$key.'` has no model to get the default language translation!');
+        }
+        return static::getDefaultTranslationValueFromModel($model, $key);
+    }
+
+    //
+    public static function getDefaultTranslationValueFromFormField(FormField $field) : mixed {
+        $name = $field->name()??$field->key(); // Checkme: is this fallback correct ?
+        if(!is_string($name) || empty($name)){
+            throw new InvalidArgumentException(message:'The field has no key : Can\'t get default translated value !');
+        }
+        $model = $field->model();
+        if(!$model || !($model instanceof ModelWithContent)){
+            throw new InvalidArgumentException(message:'The field `'.$name.'` has no model to get the default language translation!');
+        }
+        return static::getDefaultTranslationValueFromModel($model, $name);
+    }
+
+    //
+    public static function getDefaultTranslationValueFromModel(ModelWithContent $model, string $fieldKey) : mixed {
+        // Exit early ?
+        if(!$model->content()->has($fieldKey)){
+            throw new InvalidArgumentException(message:'The model has no `'.$fieldKey.'` field !');
+        }
+        
+        $defaultLang = kirby()->defaultLanguage()->code();
+        $defaultTranslation = $model->translation($defaultLang);
+        if($defaultTranslation->exists()){
+            $content = $model->translation($defaultLang)->content();
+            if(array_key_exists($fieldKey, $content)){
+                return $content[$fieldKey];
+            }
+        }
+        // return no value if unable to fetch from default lang.
+        return null;
     }
 };
 ?>

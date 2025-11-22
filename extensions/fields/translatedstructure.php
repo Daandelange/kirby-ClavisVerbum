@@ -3,6 +3,7 @@
 namespace daandelange\Taxonomy;
 
 use Daandelange\Helpers\BlueprintHelper;
+use Kirby\Cms\ModelWithContent;
 use \Kirby\Form\Form;
 use \Kirby\Data\Data;
 use Kirby\Exception\InvalidArgumentException;
@@ -65,6 +66,7 @@ return A::append( $nativeStructureFieldBlueprint, [
         },
         // Backup of the original columns function
         'originalcolumns' => $nativeStructureFieldBlueprint['computed']['columns'],
+        'originalsave' => $nativeStructureFieldBlueprint['save'],
 
         // Expands user fields to translated fields
         'expandTranslateableFields' => function(array $customFields) : array {
@@ -73,7 +75,7 @@ return A::append( $nativeStructureFieldBlueprint, [
             // Expand the user blueprint with the field-type's defaults
             $customFields = BlueprintHelper::expandFieldsProps($customFields); // get fully expanded props
             $customFields = TranslationHelper::expandTranslateableFields($customFields??[], option('daandelange.taxonomy.field.duplicationLabel', '{{ field.label }} / {{ language.name }}')); // Clone translateable fields
-            $fields = BlueprintHelper::sanitizeTranslatedStructureFieldsProps($customFields??[]);
+            $fields = TaxonomyHelper::sanitizeTranslatedStructureFieldsProps($customFields??[]);
 
             return $fields;
         },
@@ -160,6 +162,20 @@ return A::append( $nativeStructureFieldBlueprint, [
             }
             return A::append($value, $extraFields);
         },
+        'value' => function ($value=null){
+            // Always force content from primary language !
+            // Force content from default language
+            if( TaxonomyHelper::fieldContentNeedsDefaultLangTranslation($this) ){
+                $value = TranslationHelper::getDefaultTranslationValueFromFormField($this);
+
+                // return no value if unable to fetch from default lang.
+                // Note: Ensures the panel doesn't fill the field in a disabled state when there's content in an alternate lang.
+                // Note: Event with `translate: false` the panel fills the field with any default lang content.
+                // Note: Often the panel would also be unable to save
+                return $value;
+            }
+            return $value;
+        },
     ],
     'validations' => [
         // Unique key validator for the field structure field. Only for the UI to prevent duplicates.
@@ -174,7 +190,7 @@ return A::append( $nativeStructureFieldBlueprint, [
                         //if( $value['id'] == $v['id'] ) throw new \Kirby\Exception\InvalidArgumentException( I18n::template('error.validation.noduplicates', 'The key "{key}" already exists.', ['key'=>$value['id']]) );
                         if( $value[$uniqueField] == $v[$uniqueField] ){
                             //return false;
-                            throw new \Kirby\Exception\InvalidArgumentException( I18n::template('error.validation.noduplicates', 'The key "{key}" already exists.', ['key'=>$value['id']]) );
+                            throw new \Kirby\Exception\InvalidArgumentException( I18n::template('error.validation.noduplicates', 'The key "{key}" already exists, no duplicates are allowed.', ['key'=>$uniqueField]) );
                         }
                     }
                 }
@@ -205,8 +221,8 @@ return A::append( $nativeStructureFieldBlueprint, [
                 $this->hiddenpreviewfields(),
                 $this->previewLabel(),
             );
-            $tmp2 = $this->hiddenpreviewfields;
-            $tmp = $this->hiddenpreviewfields();
+            //$tmp2 = $this->hiddenpreviewfields;
+            // $tmp = $this->hiddenpreviewfields();
             return $columns;
         },
     ],
@@ -223,5 +239,14 @@ return A::append( $nativeStructureFieldBlueprint, [
         }
     ],
     // Todo: autotranslate toStructure() ?
+
+    // Custom save function
+    'save' => function($valueToStore){
+        // Only save in default language !
+        if(kirby()->language()!=kirby()->defaultLanguage()){
+            return null;
+        }
+        return $this->originalsave($valueToStore);
+    },
 ]);
 return $ret;

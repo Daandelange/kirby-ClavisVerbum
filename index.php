@@ -1,15 +1,14 @@
 <?php
 
-namespace daandelange\Taxonomy;
-
-use Kirby\Cms\App;
-use \Kirby\Content\Field as ContentField;
+namespace Daandelange\Taxonomy;
 
 @include_once __DIR__ . '/vendor/autoload.php';
 
+use \Kirby\Cms\App;
+use \Kirby\Content\Field as ContentField;
+use \Daandelange\Taxonomy\TaxonomyHelper;
+use \Daandelange\Taxonomy\TranslationHelper;
 
-require_once(__DIR__ . '/src/TaxonomyHelper.php');
-require_once(__DIR__ . '/src/TranslationHelper.php');
 
 const translatedStructureFieldName  = 'translatedstructure';
 
@@ -36,8 +35,9 @@ App::plugin('daandelange/clavisverbum', [
         },
         // Custom export-as-tags function for usage in API/Template
         // Cannot be in field.methods because that seems to only be available in the panel, not in the cms/api/template namespace
-        'toTaxonomyQuery' => require __DIR__.'/extensions/fieldmethods/toTaxonomyQuery.php',
-        'toTranslatedStruct' => require __DIR__.'/extensions/fieldmethods/toTaxonomyQuery.php',
+        'toTaxonomyQuery' => require __DIR__.'/extensions/fieldmethods/toTaxonomyQuery.php', // todo: remove ?
+        'toTaxonomyStructure' => require __DIR__.'/extensions/fieldmethods/toTaxonomyStructure.php',
+        'toTranslatedStructure' => require __DIR__.'/extensions/fieldmethods/toTranslatedStructure.php',
     ],
 
     // Translations

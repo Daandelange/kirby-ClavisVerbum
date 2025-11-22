@@ -21,11 +21,21 @@ Fields:
 Frontend tools:
 
 - Utilities to sanitize and translate a list of taxonomy.
+- Utilities to bind a field to another field.
 
 
 ## Requirements
 
 A Kirby 5 multilanguage website. *Using this plugin in a single language setup is not tested.*
+This plugin depends on [daandelange/kirby-helpers](https://github.com/Daandelange/kirby-helpers).
+
+## Install
+
+- Composer :
+  `composer require daandelange/clavisverbum`
+- GIT :
+  `git submodule add https://github.com/Daandelange/kirby-ClavisVerbum.git ./site/plugins/clavisverbum`
+  `git submodule add https://github.com/Daandelange/kirby-helpers.git ./site/plugins/daans-helpers`
 
 - - - - 
 
@@ -102,7 +112,23 @@ Note: _Some defaults have been changed for convenience._
 
 #### Frontend template
 
-For now, you have to use `$field->toStucture()` and fetch the translated fields manually.
+You can use `toTranslatedStructure()` to fetch the data; usage is like `toStucture()` but it sanitizes the data, restricting the data fields to available fields. Also, you can call `$translatedStructureObject->mytranslatedfieldname($lang=null)` to automatically grab the current language.
+
+````php
+<?php
+foreach($translatedStructureField->toTranslatedStructure() as $item){
+    // All calls below return a Kirby\Content\Field
+    // Empty translations will fallback to the default language translation
+    $item->normalfieldname();           // Non-translated value
+    $item->mytranslatedfieldname();     // Translated in current lang
+    
+    $item->mytranslatedfieldname('en'); // explict english translation
+    $item->mytranslatedfieldname_en();  // explict english translation (alt)
+}
+?>
+````
+
+You can also use `$translatedStructureField->toStucture()` and fetch the translated fields manually.
 
 - - - -
 
