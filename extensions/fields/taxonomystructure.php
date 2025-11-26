@@ -120,6 +120,10 @@ return A::append( $translatedStructureFieldBlueprint, [
         'keyfieldname' => function(){
             return TaxonomyHelper::$taxonomyStructureKeyFieldName;
         },
+        'tagsBinding' => function(){ // Unused ?
+            // Get tagbindings
+            return TaxonomyHelper::parseTagsBindingFromFields($this->fields);
+        }
     ],
     
     // Todo: autotranslate toStructure() ? (frontend helper)

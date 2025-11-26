@@ -61,17 +61,53 @@ class TaxonomyHelper {
         return FieldHelper::nativeFieldFunction('structure', 'save', $structureField, null, $value);
     }
 
+    // Returns parsed taxonomy bindings
+    public static function parseTaxonomyBindings(array|string $taxonomyBindings, bool $allowThrow = true) : ?array {
+        // Kirby style: if string, use as default value for array
+        if(is_string($taxonomyBindings)) $taxonomyBindings = ['field'=>$taxonomyBindings];
+
+        // Ensure correct blueprint setup
+        if( count($taxonomyBindings) <= 0 || !isset($taxonomyBindings['field']) || empty($taxonomyBindings['field']) ){
+            if($allowThrow)
+                throw new InvalidArgumentException('If using "taxonomybindings", please provide at least a "field" property.');
+            else
+                return null;
+        }
+        
+        // Sanitize text, value, info and tag keys
+        // if(false){
+        // if( !isset($taxonomyBindings['textkey'])  || !is_string($taxonomyBindings['textkey' ]) ){
+        //     $taxonomyBindings['textkey']  = taxonomyHelper::$taxonomyStructureTextFieldName;
+        // }
+        // if( !isset($taxonomyBindings['valuekey']) || !is_string($taxonomyBindings['valuekey']) ){
+        //     $taxonomyBindings['valuekey'] = taxonomyHelper::$taxonomyStructureKeyFieldName;
+        // }
+        // if( !isset($taxonomyBindings['infokey']) || !is_string($taxonomyBindings['infokey']) ){
+        //     $taxonomyBindings['infokey'] = taxonomyHelper::$taxonomyStructureInfoFieldName;
+        // }
+        // if( !isset($taxonomyBindings['iconkey']) || !is_string($taxonomyBindings['iconkey']) ){
+        //     $taxonomyBindings['iconkey'] = taxonomyHelper::$taxonomyStructureIconFieldName;
+        // }
+        // }
+
+        // Todo: Append custom fields and separate text, value fields ?
+        // And validate if they exist in the blueprint ?
+
+        return $taxonomyBindings;
+    }
+
     // Generates options from a taxonomybinding
     public static function getFieldOptionsPropsFromTaxonomyBinding(array $taxonomyBindings) : ?array {
         if (array_key_exists('field', $taxonomyBindings)) {
             $taxonomyFieldAddr = $taxonomyBindings['field'];
             return [
                 'type'  => 'query',
-                'query' => $taxonomyFieldAddr.'.toTaxonomyQuery(\''.$taxonomyBindings['textkey'].'\')',
-                'value' => '{{ structureItem.value }}',
-                'text'  => '{{ structureItem.text }}',
-                'info'  => '{{ structureItem.info }}',
-                'tag'  => '{{ structureItem.tag }}',
+                'query' => $taxonomyFieldAddr.'.toTaxonomyStructure().toTags()',
+                // Needed to Options::factory doesn't strip icon and info !!!
+                'value' => '{{ item.value }}',
+                'text'  => '{{ item.text }}',
+                'info'  => '{{ item.info }}',
+                'icon'  => '{{ item.icon }}',
             ];
         }
         return null;
@@ -109,56 +145,6 @@ class TaxonomyHelper {
     public static function getTaxonomyBindingsFromCmsField(ContentField $field) : ?array {
         $fieldProps = FieldHelper::getFieldPropsFromCmsField($field, static::$taxonomyBindingsPropName);
         return $fieldProps?static::parseTaxonomyBindings($fieldProps, false):null;
-    }
-
-    // Returns parsed taxonomy bindings
-    public static function parseTaxonomyBindings(array|string $taxonomyBindings, bool $allowThrow = true) : ?array {
-        // Kirby style: if string, use as default value for array
-        if(is_string($taxonomyBindings)) $taxonomyBindings = ['field'=>$taxonomyBindings];
-
-        // Ensure correct blueprint setup
-        if( count($taxonomyBindings) <= 0 || !isset($taxonomyBindings['field']) || empty($taxonomyBindings['field']) ){
-            if($allowThrow)
-                throw new InvalidArgumentException('If using "taxonomybindings", please provide at least a "field" property.');
-            else
-                return null;
-        }
-        
-        // Sanitize text, value, info and tag keys
-        if( !isset($taxonomyBindings['textkey'])  || !is_string($taxonomyBindings['textkey' ]) ){
-            $taxonomyBindings['textkey']  = taxonomyHelper::$taxonomyStructureTextFieldName;
-        }
-        if( !isset($taxonomyBindings['valuekey']) || !is_string($taxonomyBindings['valuekey']) ){
-            $taxonomyBindings['valuekey'] = taxonomyHelper::$taxonomyStructureKeyFieldName;
-        }
-        if( !isset($taxonomyBindings['infokey']) || !is_string($taxonomyBindings['infokey']) ){
-            $taxonomyBindings['infokey'] = taxonomyHelper::$taxonomyStructureInfoFieldName;
-        }
-        if( !isset($taxonomyBindings['iconkey']) || !is_string($taxonomyBindings['iconkey']) ){
-            $taxonomyBindings['iconkey'] = taxonomyHelper::$taxonomyStructureIconFieldName;
-        }
-
-        // Todo: Append custom fields and separate text, value fields ?
-        // And validate if they exist in the blueprint ?
-
-        return $taxonomyBindings;
-    }
-
-    // Formatting utilities
-    // - - - -
-
-    // Extracts the text field from the right language
-    public static function getTaxonomyTextKeyForLang(array $taxonomyBindings, ?Language $lang=null ): ?string {
-        //if(!$lang) $lang = $this->kirby()->defaultLanguage(); // Uses default language
-        if(!$lang) $lang = kirby()->language(); // Uses the currently active language by default
-
-        // Fixme: default lang still without `_code` ?
-        return ($taxonomyBindings['textkey']??'name').( $lang->isDefault() ? ('') : ('_'.$lang->code()));
-    }
-
-    // Gets the unique key field name ('id' by default)
-    public static function getTaxonomyValueKey(array $taxonomyBindings) : ?string {
-        return $taxonomyBindings['valuekey']??static::$taxonomyStructureKeyFieldName;
     }
 
     // Returns the field's selected tags as fully expanded & sanitised tags
@@ -248,12 +234,6 @@ class TaxonomyHelper {
             }
         }
         return null;
-    }
-
-    // Returns the field's selected tags as fully expanded & anitised tags
-    public static function getTagsFromCmsField(ContentField $cmsField, int $returnMode = TaxonomyItemGetterMode::SANITIZED_TAGS) : ?array {
-        $formField = FieldHelper::getFormFieldFromCmsField($cmsField);
-        return $formField ? static::getTagsFromFormField($formField, $returnMode) : null;
     }
 
     // Custom export-as-tags function for usage in API/Template (loading FormFields is probably quite heavy in CMS namespace, this aims to be a lightweight alternative to the provided panel functions)
@@ -347,6 +327,22 @@ class TaxonomyHelper {
 
     // like native toStructure
     public static function getTranslatedStructureFromContentField(ContentField $translatedStructureField) : TranslatedStructure {
+        
+        // Force content from default language
+        if(TaxonomyHelper::fieldContentNeedsDefaultLangTranslation($translatedStructureField)){
+            // Force-use translated version (never use alt language content)
+            $translatedValue = TranslationHelper::getDefaultTranslationValueFromContentField($translatedStructureField);
+
+            $taxonomyStructureField = $translatedStructureField->value($translatedValue);
+        }
+
+        // Get sanitized data
+        $data = Data::decode($translatedStructureField->value, 'yaml');
+        if(!is_array($data)){ // only accept arrays
+            $data=[];
+        }
+        
+        // Native behaviour
         try {
             return TranslatedStructure::factory(
                 Data::decode($translatedStructureField->value, 'yaml'),
@@ -382,11 +378,10 @@ class TaxonomyHelper {
     //
     public static function getTaxonomyStructureFromContentField(ContentField $taxonomyStructureField) : TaxonomyStructure {
         
-        // TODO
         // Force content from default language
         if(TaxonomyHelper::fieldContentNeedsDefaultLangTranslation($taxonomyStructureField)){
             // Force-use translated version (never use alt language content)
-            $translatedValue = static::getDefaultTranslationValueFromContentField($taxonomyStructureField);
+            $translatedValue = TranslationHelper::getDefaultTranslationValueFromContentField($taxonomyStructureField);
 
             $taxonomyStructureField = $taxonomyStructureField->value($translatedValue);
         }
@@ -494,14 +489,55 @@ class TaxonomyHelper {
 
             // Split over width (aka all languages on one line)
             if( $field['spreadlangsoverwidth']??false ){
-                $field['width'] = '1/'.kirby()->languages()->count();
+                $field['width'] = static::getWidthFromLanguages();
             }
         }
 
         return $fields;
     }
 
+    // Returns one of the available layout widths for spanning 1 item translations over 1 line
+    const AvailableLayoutWidths = [1,2,3,4,6,12];
+    public static function getWidthFromLanguages(){
+        // Available widths: 1/1 1/2 1/3 1/4 1/6 1/12
+        $cnt = kirby()->languages()->count();
+        foreach(static::AvailableLayoutWidths as $w){
+            if($w<=$cnt) return '1/'.$w;
+        }
+    }
+
+    // Grabs tags/options binding from fields
+    public static function parseTagsBindingFromFields(array $fields=[]) : array {
+        $binding = TaxonomyStructure::defaultTagFormat;
+        foreach($fields as $fieldKey => $fieldData){
+            // Ignore translated fields
+            if(!is_array($fieldData) || (array_key_exists('istranslatedfield', $fieldData) && $fieldData['istranslatedfield']===true)){
+                continue;
+            }
+            // Grab tagsbinding ?
+            if(array_key_exists('tagsbinding', $fieldData) && $tb=$fieldData['tagsbinding']){
+                // Kirby-style: Got string? Expand: Use same key as field !
+                if(is_string($tb)){
+                    $tb=[$tb => '{{ structureItem.'.$fieldKey.' }}'];
+                }
+                // Add first (and supposed only) item to binding
+                if(is_array($tb)){
+                    $tagsKey = array_key_first($tb);
+                    if(is_string($tagsKey)){
+                        $binding[$tagsKey] = $tb[$tagsKey];
+                    }
+                    // todo: warn misconfiguration when non-string keys ?
+                }
+
+                // Remove as if it never existed ??
+                //unset($fields[$fieldKey]['tagsbinding']);
+            }
+        }
+        return $binding;
+    }
+
     // Helps consolidate translatedstructure inner field props : enforce minimum fields (ID+another)
+    // Note: Needs untranslated fields
     public static function parseTaxonomyStructureFields(array $fields=[]) : array {
         // Backup & Delete user key field
         $userKeyField = $fields[TaxonomyHelper::$taxonomyStructureKeyFieldName] ?? [];
@@ -525,19 +561,19 @@ class TaxonomyHelper {
             'maxlength' => $userKeyField['maxlength'] ?? 32,
             'unique' => true, // Custom unique validator flag
             //'sync' => TaxonomyHelper::$taxonomyStructureKeyFieldName.((kirby()->multilang() && kirby()->languages()->count() > 1)?'_'.kirby()->defaultLanguage()->code():''), // Sync slug with default lang title
-            'sync' => TaxonomyHelper::$taxonomyStructureKeyFieldName.'_'.kirby()->defaultLanguage()->code(), // Sync slug with default lang title
+            'sync' => $userKeyField['sync']??(TaxonomyHelper::$taxonomyStructureTextFieldName.'_'.kirby()->defaultLanguage()->code()), // Sync slug with default lang title
             'mobile' => true, // Always visible on mobile
             'disabled' => true, // prevent editing
         ];
 
         // Add default "name" field if no fields are provided
         if(count($fields) <= 1){
-            $customFields[TaxonomyHelper::$taxonomyStructureTextFieldName]=[
+            $fields[TaxonomyHelper::$taxonomyStructureTextFieldName]=[
                 'type'  => 'text',
                 'name'  => TaxonomyHelper::$taxonomyStructureTextFieldName,
                 'label' => 'Name',
-                'required' => true, // Custom naming convention, to be documented
-                //'hidden' => false, // Prevents undefined array key "hidden" in native structurefield
+                'required' => true,
+                //'hidden' => false, // Prevents undefined array key "hidden" in native structurefield ?
                 'translate' => true,
             ];
         }

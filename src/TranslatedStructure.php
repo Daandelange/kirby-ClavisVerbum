@@ -30,7 +30,7 @@ class TranslatedStructure extends Structure { // (which extends Collection)
 
 	// Returns the translated fields
 	public function getTransatedFields() : array {
-		return array_slice($this->translatedFields, 0); // returns an explicit copy to prevent inner modifications
+		return array_slice($this->originalFields, 0); // returns an explicit copy to prevent inner modifications
 	}
 	// Returns the original fields
 	public function getOriginalFields() : array {
@@ -57,7 +57,7 @@ class TranslatedStructure extends Structure { // (which extends Collection)
 			}
 
 			// Grab field props
-			$props = BlueprintHelper::getFieldBlueprint($field, true);
+			$props = BlueprintHelper::getFieldBlueprint($field, false);
 	
 			// Check field type and data
 			if(empty($props)){
@@ -157,29 +157,5 @@ class TranslatedStructure extends Structure { // (which extends Collection)
 		}
 
 		parent::__set($object->id(), $object);
-	}
-
-
-
-	// // Overridden _call to enable calling $collection->translatedField()
-	// public function __call(string $key, $arguments)
-	// {
-	// 	// collection methods
-	// 	if ($this->hasMethod($key) === true) {
-	// 		return parent::__call($key, $arguments);
-	// 	}
-
-	// 	// Translations
-	// 	if(kirby()->multilang()){
-	// 		$field_in_curlang = $key.'_'.kirby()->language()->code();
-	// 		if($this->hasField($field_in_curlang)){
-	// 			return $this->{$field_in_curlang}();
-	// 		}
-	// 	}
-	// }
-
-	// Export to tags
-	public function toTags() : array {
-		return [];
 	}
 }

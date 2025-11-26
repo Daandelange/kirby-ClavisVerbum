@@ -35,9 +35,10 @@ App::plugin('daandelange/clavisverbum', [
         // },
         // Custom export-as-tags function for usage in API/Template
         // Cannot be in field.methods because that seems to only be available in the panel, not in the cms/api/template namespace
-        'toTaxonomyQuery' => require __DIR__.'/extensions/fieldmethods/toTaxonomyQuery.php', // todo: remove ?
+        //'toTaxonomyQuery' => require __DIR__.'/extensions/fieldmethods/toTaxonomyQuery.php', // todo: remove ?
         'toTaxonomyStructure' => require __DIR__.'/extensions/fieldmethods/toTaxonomyStructure.php',
         'toTranslatedStructure' => require __DIR__.'/extensions/fieldmethods/toTranslatedStructure.php',
+        'toTaxonomyTags' => require __DIR__.'/extensions/fieldmethods/toTaxonomyTags.php',
     ],
 
     // Translations

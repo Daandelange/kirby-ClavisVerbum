@@ -35,7 +35,9 @@ This plugin depends on [daandelange/kirby-helpers](https://github.com/Daandelang
   `composer require daandelange/clavisverbum`
 - GIT :
   `git submodule add https://github.com/Daandelange/kirby-ClavisVerbum.git ./site/plugins/clavisverbum`
+  `cd /site/plugins/clavisverbum && composer install`
   `git submodule add https://github.com/Daandelange/kirby-helpers.git ./site/plugins/daans-helpers`
+  `cd /site/plugins/daans-helpers && composer install`
 
 - - - - 
 
@@ -81,7 +83,8 @@ Note: _Some defaults have been changed for convenience._
             validate: noduplicates
             # Field names to remove from the preview column
             hiddenpreviewfields: # default=[]
-                - myfieldname
+                - myfieldname_fr # hide a french field
+                - myfieldname # hide a non translated field
             # Show all languages of a field on one line ?
             spreadlangsoverwidth: true # default=false
             # Show default language fields only in preview columns.
@@ -112,11 +115,13 @@ Note: _Some defaults have been changed for convenience._
 
 #### Frontend template
 
-You can use `toTranslatedStructure()` to fetch the data; usage is like `toStucture()` but it sanitizes the data, restricting the data fields to available fields. Also, you can call `$translatedStructureObject->mytranslatedfieldname($lang=null)` to automatically grab the current language.
+You can use `toTranslatedStructure()` to fetch the data; usage is like `toStucture()` but it sanitizes the data, restricting the data fields to the available fields. Also, you can call `$translatedStructureObject->mytranslatedfieldname($lang=null)` to automatically grab the current language.
 
 ````php
 <?php
-foreach($translatedStructureField->toTranslatedStructure() as $item){
+$translatedStructure = $translatedStructureField->toTranslatedStructure();
+// You can loop the data like this. As a Structure, it's a Kirby Collection.
+foreach($translatedStructure as $item){
     // All calls below return a Kirby\Content\Field
     // Empty translations will fallback to the default language translation
     $item->normalfieldname();           // Non-translated value
@@ -125,10 +130,20 @@ foreach($translatedStructureField->toTranslatedStructure() as $item){
     $item->mytranslatedfieldname('en'); // explict english translation
     $item->mytranslatedfieldname_en();  // explict english translation (alt)
 }
+
+// Or use the data as an array :
+$data = $translatedStructure->toArray();
+
+// There's also a way to loop your data fields as defined in the blueprint
+$untranslatedFields = $translatedStructure->getTransatedFields(); // Retuns array
+foreach($translatedStructure->getTransatedFields() as $id => $field){
+    echo(\Kirby\Cms\Html::a('./tags/'.$id, $field['label']));
+}
 ?>
 ````
 
-You can also use `$translatedStructureField->toStucture()` and fetch the translated fields manually.
+Note: You can also use the native `$translatedStructureField->toStucture()` and fetch the translated fields manually.
+Note that this doesn't sanitize any data. [More information on the native structure field](https://getkirby.com/docs/reference/panel/fields/structure).
 
 - - - -
 
@@ -153,26 +168,58 @@ Blueprint options are inherited from the `translatedstructure` field, except the
             allowremove: true # bool, default=false
             # Your regular fields (with some extra props)
             # This is a template but you can add as many fields as you wish
+            # For now, it's recommended to use a description + name + id field
+            # You may also add extra fields
             fields:
-                # The id field is automatically added, but you can change its props
+                # The id field is automatically added, but you can change some of its props
                 id:
                     label: Unique ID
                 name:
                     type: text
                     translate: true
                     required: true
+                    # When converting to tags, make this field the text field
+                    tagsbinding: text
+                    # Custom tabs binding
+                    tagsbinding: 
+                        text: '{{ structureItem.name }}'
                 description:
                     type: text
                     translate: true
 ````
 
+The `tabsbinding` lets you map structure fields to option fields.
+This is automatically set if you use the recommended fields `id`,`name` and `description`. For custom fields, use the extra field prop to set this right.
+
 #### Frontend template
 
 ````php
+<?php
+// Returns a TaxonomyStructure
+// Which also is a TranslatedStructure (see usage above)
+$taxonomy = $field->toTaxonomyStructure();
 
+// Extra TaxonomyStructure features
+$options = $taxonomy->toTags(); // All structure items as a rendered Options array
+
+$tags = ['hello', 'world']; // <-- typically $tagsField->split()
+$selection = $taxonomy->toTags($tags); // Selected structure items as a rendered Options array
+
+// The tagsbinding generated from your fields
+$tagsbinding = $taxonomy->getTagsBinding(); // Array with field->tag mappings
+// It's an array with Options keys and KQL strings with the target value.
+// Available arguments: `structureItem`.
+$tagsbinding = [
+    'value' => '{{ structureItem.id }}',
+    'text' => '{{ structureItem.name }}',
+    'info' => '{{ structureItem.description }}',
+    'icon' => 'tag',
+];
+$selection = $taxonomy->toTags($tags, $tagsbinding); // Usage with a custom binding
+?>
 ````
 
-You can also use `$field->toTaxonomyQuery()` to feed a native `tags` field with options.
+You can also use `$taxonomyStructure->toTags()` to feed a native `tags` field (and other fields with options). Also see your fields' `tagsbinding` props for usage with custom fields.
 
 ````yml
 fields:
@@ -181,14 +228,25 @@ fields:
         label: Native Tags
         help: These are populated from a taxonomystructure
         accept: options
-        # Choose either one options prop : toTaxonomyQuery or toStructure
+        # Method 1 : toTaxonomyTags. (recommended) Uses tagsbinding from blueprint fields.
         options:
           type: query
-          query: site.keywordstaxonomy.toTaxonomyQuery('name')
-          value: '{{ structureItem.value }}'
-          text: '{{ structureItem.text }}'
-          info: '{{ structureItem.info }}'
+          query: site.keywordstaxonomy.toTaxonomyStructure.toTags
+        # Method 1 : custom toTaxonomyTags (a bit verbose)
+        # Note: If you need to provide a custom tags mapping, toTags can be used like this:
+        options:
+          type: query
+          # Note: As we can't build associative arrays from blueprints/KQL, a helper turns this into an associative array
+          query: 'site.keywordstaxonomy.toTaxonomyStructure().toTags(null, [ ["value","{{ structureItem.id }}"],["text","{{ structureItem.id }}"],["info","{{ structureItem.id }}"],["icon","tag"] ])',
+        # Method 2 : toTaxonomyStructure
+        options:
+          type: query
+          query: site.keywordstaxonomy.toTaxonomyStructure
+          value: '{{ structureItem.id }}'
+          text: '{{ structureItem.name }}'
+          info: '{{ structureItem.description }}'
           icon: tag
+        # Method 3: toStructure (and more advanced query strings)
         options:
           type: query
           query: site.keywordstaxonomy.toStructure
@@ -218,23 +276,13 @@ fields:
         taxonomybindings:
             # The taxonomystructure target field
             field: site.keywordstaxonomy
-            # The text key (default=name)
-            textkey: name
-            # The id key (optiodefault=id)
-            valuekey: id
-            # The description key (optional)
-            infokey: description # (todo)
 ````
 
 #### Frontend template
 
-NotYetAvailable: `$field->toTranslatedStructure()` : Sanitize and get the structure in the correct language. Returns a `Kirby/Cms/Structure`.
-
-Note: This plugin is also `$field->toStructure()` compatible, you'll get all the fields from your blueprint including all translations. Note that this doesn't sanitize any data. [More information on the native structure field](https://getkirby.com/docs/reference/panel/fields/structure).
-
 ````php
 <?php
-foreach($field->toTaxonomyStructure() as $entry){
+foreach($field->toTaxonomyTags() as $entry){
     
 }
 ?>
@@ -248,9 +296,9 @@ foreach($field->toTaxonomyStructure() as $entry){
 
 - [sylvainjule/Kirby-categories](https://github.com/sylvainjule/kirby-categories) : A similar plugin that uses another approach : Syncs all taxonomy changes down to their respective content files, heavily relying on panel hooks to sync/apply changes.
 
-- [hananils/Kirby-choice](https://github.com/hananils/kirby-choice) : A fontend tool to sanitize data from fields with `options`. (no multilanguage support)
+- [hananils/Kirby-choice](https://github.com/hananils/kirby-choice) : A fontend tool to sanitize data from fields with `options`. (no true multilanguage support)
 
-- [https://github.com/bvdputte/kirby-taxonomy](https://github.com/bvdputte/kirby-taxonomy) : Another taxonomy plugin (probably for older Kirby versions). 
+- [bvdputte/kirby-taxonomy](https://github.com/bvdputte/kirby-taxonomy) : Another taxonomy plugin (probably for older Kirby versions). 
 
 - [lukaskleinschmidt/synced-structure](https://gist.github.com/lukaskleinschmidt/1c0b94ffab51d650b7c7605a4d25c213) : Very simple but powerful translateable structure by syncing on save.
 

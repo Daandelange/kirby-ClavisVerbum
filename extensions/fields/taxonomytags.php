@@ -50,8 +50,9 @@ return A::append($nativeStructureFieldBlueprint, [
         'getOptions' => function () : array {
             // Original func from config/fields/mixins/options.php
             $props   = FieldOptions::polyfill($this->props); // Standardize options (with old APIs?)
-            if(!isset($props['options']['info'])) $props['options']['info']='{{ structureItem.info }}';
-            if(!isset($props['options']['icon'])) $props['options']['icon']='tag';
+            // options->render will strip icon/info if there's no icon/info fields in the query, even if items are in the data !!!
+            //if(!isset($props['options']['info'])) $props['options']['info']='{{ structureItem.info }}';
+            //if(!isset($props['options']['icon'])) $props['options']['icon']='tag';
             $options = FieldOptions::factory($props['options']);
             $options = $options->render($this->model());
 
@@ -65,14 +66,14 @@ return A::append($nativeStructureFieldBlueprint, [
         // 'getTaxonomyBindingsOld' => function(): ?array {
         //     return TaxonomyHelper::getTaxonomyBindingsFromFormField($this);
         // },
-        'getTaxonomyTextKeyForLang' => function(?\Kirby\Cms\Language $lang=null, ?string $baseTextKey=null ): ?string {
-            // return TaxonomyHelper::getTaxonomyTextKeyForLang($this->getTaxonomyBindings(), $lang);
-            return TaxonomyHelper::getTaxonomyTextKeyForLang(TaxonomyHelper::getTaxonomyBindingsFromFormField($this), $lang);
-        },
-        'getTaxonomyValueKey' => function() : ?string {
-            // return TaxonomyHelper::getTaxonomyValueKey($this->getTaxonomyBindings());
-            return TaxonomyHelper::getTaxonomyValueKey(TaxonomyHelper::getTaxonomyBindingsFromFormField($this));
-        },
+        // 'getTaxonomyTextKeyForLang' => function(?\Kirby\Cms\Language $lang=null, ?string $baseTextKey=null ): ?string {
+        //     // return TaxonomyHelper::getTaxonomyTextKeyForLang($this->getTaxonomyBindings(), $lang);
+        //     return TaxonomyHelper::getTaxonomyTextKeyForLang(TaxonomyHelper::getTaxonomyBindingsFromFormField($this), $lang);
+        // },
+        // 'getTaxonomyValueKey' => function() : ?string {
+        //     // return TaxonomyHelper::getTaxonomyValueKey($this->getTaxonomyBindings());
+        //     return TaxonomyHelper::getTaxonomyValueKey(TaxonomyHelper::getTaxonomyBindingsFromFormField($this));
+        // },
 
         // Copy of native function, used to fill data
         // Note: first Kirby parses all props+computed, then $field->fill() triggers prop.value and runs all computed again.
@@ -263,16 +264,18 @@ return A::append($nativeStructureFieldBlueprint, [
 
                         // Convert newly added data to tag options
                         // array_values = Ensure to stay an array when transmitted to the panel
-                        $newOptions = array_values($updatedPage->{$structureFormField->key()}()->toTaxonomyQuery()->toArray()); 
+                        // $newOptions = array_values($updatedPage->{$structureFormField->key()}()->toTaxonomyQuery()->toArray());
+                        $newOptions = array_values($updatedPage->{$structureFormField->key()}()->toTags()); // checkme: still works in panel ?
                         
+                        // Grab modified options only ?
                         $newTagData = [];
-                        foreach($newOptions as $o){
-                            if($o['value']==$newTag['id']){
-                                $newTagData = $o;
-                                break;
-                            }
-                        }
-                        //$modelsAreSame = $structureFormField->model() == $this->field()->model();
+                        // foreach($newOptions as $o){
+                        //     if($o['value']==$newTag['id']){
+                        //         $newTagData = $o;
+                        //         break;
+                        //     }
+                        // }
+                        // //$modelsAreSame = $structureFormField->model() == $this->field()->model();
 
                         return [
                             'status'    => 'success',

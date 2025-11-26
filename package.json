@@ -1,6 +1,6 @@
 {
   "name": "kirby-clavisverbum",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A multlanguage taxonomy field for Kirby.",
   "main": "index.js",
   "author": "Daan de Lange",

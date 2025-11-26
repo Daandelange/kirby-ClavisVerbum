@@ -11,7 +11,7 @@ return function(ContentField $taxonomyStructureField) : TaxonomyStructure {
     try {
         return TaxonomyHelper::getTaxonomyStructureFromContentField($taxonomyStructureField);
     } catch(Throwable $e){
-        // Return empty structure on error ?
+        // Return empty structure on error
         return new TaxonomyStructure([],['parent'=>$taxonomyStructureField->model(), 'field'=>$taxonomyStructureField]);
     }
 };
