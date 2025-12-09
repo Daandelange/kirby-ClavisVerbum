@@ -1,9 +1,9 @@
 {
     "name": "daandelange/clavisverbum",
-    "description": "A multlanguage taxonomy field for Kirby.",
+    "description": "A multilanguage taxonomy field for Kirby.",
     "homepage": "https://github.com/Daandelange/kirby-clavisverbum",
     "type": "kirby-plugin",
-    "version": "0.2.0",
+    "version": "0.2.1",
     "license": "MIT",
     "authors": [
         {

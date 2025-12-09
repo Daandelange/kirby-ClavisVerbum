@@ -1,7 +1,7 @@
 {
   "name": "kirby-clavisverbum",
-  "version": "0.2.0",
-  "description": "A multlanguage taxonomy field for Kirby.",
+  "version": "0.2.1",
+  "description": "A multilanguage taxonomy field for Kirby.",
   "main": "index.js",
   "author": "Daan de Lange",
   "license": "MIT",
@@ -16,10 +16,11 @@
   },
   "devDependencies": {
     "kirbyup": "^2.2.1",
-    "kirbyuse": "^1.0.0",
-    "less": "^4.4.2"
+    "less": "^4.4.2",
+    "@vue/language-server": "~3.0.0"
   },
   "dependencies": {
-    "daans-kirby-helpers": "github:Daandelange/kirby-helpers"
+    "daans-kirby-helpers": "github:Daandelange/kirby-helpers",
+    "kirbyuse": "^0.2.1"
   }
 }

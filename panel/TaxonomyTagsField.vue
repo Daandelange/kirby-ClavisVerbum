@@ -41,7 +41,7 @@
 					icon="edit"
 					variant="filled"
 					size="xs"
-					@click="$panel.open(taxonomyEditUrl)"
+					@click="usePanel().open(taxonomyEditUrl)"
 				/>
 			</k-button-group>
 		</template>
@@ -51,6 +51,7 @@
 
 <script>
 import NativeStructureField from "@/components/Forms/Field/StructureField.vue";
+import { useApi, useHelpers, usePanel } from "kirbyuse";
 
 // Todo: Snapping features ?
 export default {
@@ -100,15 +101,17 @@ export default {
 		// Own method
 		// Adds a new entry and opens the form 
 		add(){
+			const helpers = useHelpers();
 			// Fresh data
-			this.newEntryValue = this.$helper.field.form(this.fields);
+			this.newEntryValue = helpers.field.form(this.fields);
 			// Open drawer
 			this.open(this.newEntryValue);
 		},
 
 		// From StructureField.vue (modified)
 		close() {
-			this.$panel.drawer.close(this.id+'_drawer');
+			const panel = usePanel();
+			panel.drawer.close(this.id+'_drawer');
 		},
 
 		// From StructureField.vue (stripped)
@@ -119,9 +122,10 @@ export default {
 			}
 
 			// Force-enable key field
-			this.fields.id.disabled = !this.$helper.string.isEmpty(item[this.keyfieldname??'id']);
+			this.fields.id.disabled = !useHelpers().string.isEmpty(item[this.keyfieldname??'id']);
 
-			this.$panel.drawer.open({
+			const panel = usePanel();
+			panel.drawer.open({
 				component: "k-structure-drawer",
 				id: this.id+'_drawer',
 				props: {
@@ -144,7 +148,8 @@ export default {
 						// The tags can then be saved on panel.save();
 						// Then we check if other page content need to be updated (the tags struct)
 
-						this.$api.post(
+						const api = useApi();
+						api.post(
 							this.endpoints.field + "/addTag",
 							{newTag: formData},
 							null,
@@ -162,14 +167,14 @@ export default {
 								this.$emit('input', this.value);
 								
 								// Show success message
-								this.$panel.notification.open(result);
+								panel.notification.open(result);
 
 								// Save
 								//this.save();
 								this.close();
 
 								// Wait for reload (needed to update the structure data if on the same page)
-								//await this.$panel.reload();
+								//await panel.reload();
 
 								// Update model keywords if on same model
 								if(result.data.newStructureContent && this.taxonomyIsOnSameModel){
@@ -177,42 +182,43 @@ export default {
 									// The page content needs to be updated not to be erased when the tagsfield change is saved (it would revert to original).
 									// Otherwise we don't need to update the content, the page with the taxonomy has been updated
 									let structureFieldName = result.data.structureFieldName??this.structureFieldName;
-									if(structureFieldName && !this.$helper.string.isEmpty(structureFieldName)){
+									const helpers = useHelpers();
+									if(structureFieldName && !helpers.string.isEmpty(structureFieldName)){
 										// V1: use php/backend value
 										//let isOnSameModel = result.data.structureIsOnSameModel ?? structureFieldName;
 										// V2: use js/frontend value
 										//let isOnSameModel = (this.$attrs["form-data"]?.structureFieldName) ? (this.$attrs["form-data"][structureFieldName]==structureFieldName):false;
 										//window.console.log("isOnSameModel=",isOnSameModel, "structureFieldName=", structureFieldName);
 										
-										this.$panel.content.update({ [structureFieldName]: result.data.newStructureContent});
+										panel.content.update({ [structureFieldName]: result.data.newStructureContent});
 									}
 								}
 							}
 							else {
 								if(response.errors){
-									this.$panel.error(response.errors, true);
+									panel.error(response.errors, true);
 								}
-								else this.$panel.error(result, true);
+								else panel.error(result, true);
 							}
 
 						} ).catch( (data) => {
 							//this.submittingTag = false;
 							//console.log('Api EDIT error=', data);
 							if(data.details ){
-								//this.$panel.error(data, true); // Warning! Stips off error details !
+								//panel.error(data, true); // Warning! Stips off error details !
 								// If errors : holds validation details per field:
-								this.$panel.dialog.open({
+								panel.dialog.open({
 									component: "k-error-dialog",
 									props: data
 								});
 							}
 							// Any other info, stripped to message only, forwarded to drawer
 							else if(data.message){
-								this.$panel.error(data, true);
+								panel.error(data, true);
 							}
 							else {
 								// Probably a network error / other
-								this.$panel.error({
+								panel.error({
 									message: "There was an error adding the tag !",
 									details: error,
 								}, true);
@@ -244,7 +250,7 @@ export default {
 
 		// From StructureField.vue (original)
 		hasFields() {
-			return this.$helper.object.length(this.fields) > 0;
+			return useHelpers().object.length(this.fields) > 0;
 		},
 
 		// Adds the tag to the tags, only in the GUI
@@ -259,7 +265,7 @@ export default {
 		
 		// Todo: is this still useful ??
 		async validate(model) {
-			const errors = await this.$api.post(
+			const errors = await useApi().post(
 				this.taxonomyEndpoint + "/validate",
 				model
 			);
@@ -281,7 +287,7 @@ export default {
 		 * @returns {Object}
 		 */
 		form() {
-			return this.$helper.field.subfields(this, this.fields);
+			return useHelpers().field.subfields(this, this.fields);
 		},
 		/** from StructureField.Vue
 		 * Returns if new entries can be added
@@ -303,7 +309,7 @@ export default {
 			return (this.newOptions??this.options??[]).map(function(opt) {
 				// enforce image from icon
 				// if((!opt.image) && thisField.$helper.string.isEmpty(opt.icon)){
-				if((!opt.image) && !window.panel.app.$helper.string.isEmpty(opt.icon)){
+				if((!opt.image) && !useHelpers().string.isEmpty(opt.icon)){
 					opt.image = { type: 'icon', icon: opt.icon};
 				} 
 				return opt;

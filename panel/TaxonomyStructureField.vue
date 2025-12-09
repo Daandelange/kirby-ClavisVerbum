@@ -2,6 +2,8 @@
 
 import { invertCustomAndNativeFunctions } from 'daans-kirby-helpers/modules';
 
+import { useHelpers } from "kirbyuse";
+
 // Todo: Snapping features ?
 export default {
 	name: 'k-taxonomystructure-field',
@@ -46,8 +48,9 @@ export default {
 		// When a form item is opened, make key field editable depending on empty(value)
 		// So it can be set on creation, but never changed afterwards
 		openCustom(item, field, replace = false){
+			const helpers = useHelpers();
 			//window.console.log("keyfieldname=", this.keyfieldname??'id', item);
-			this.fields.id.disabled = !this.$helper.string.isEmpty(item[this.keyfieldname??'id']);
+			this.fields.id.disabled = !helpers.string.isEmpty(item[this.keyfieldname??'id']);
 			return this.openNative(item, field, replace);
 		},
 
@@ -74,7 +77,8 @@ export default {
 
 		// Disable remove functions
 		removeCustom(item){ // Bcoz the drawer can still call it.
-			if(this.allowremove || this.$helper.string.isEmpty(item[this.keyfieldname??'id'])){ // Allow removing empty key (new entry not yet saved)
+			const helpers = useHelpers();
+			if(this.allowremove || helpers.string.isEmpty(item[this.keyfieldname??'id'])){ // Allow removing empty key (new entry not yet saved)
 				this.removeNative(item);
 			}
 			// Close the drawer

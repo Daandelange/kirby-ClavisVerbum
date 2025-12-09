@@ -25,7 +25,6 @@ use \Daandelange\Taxonomy\TranslatedStructure;
 
 require_once(__DIR__.'/TaxonomyStructure.php');
 
-
 class TaxonomyItemGetterMode {
     const SANITIZED_TAGS = 1; // Return field items/tags, restricted to available options
     const UNSANITIZED_TAGS = 2; // Return field items, tranformed to tags.

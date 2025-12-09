@@ -1,8 +1,9 @@
+import { usePanel } from "kirbyuse";
 
 import TaxonomyStructureField from "./TaxonomyStructureField.vue"
 import TaxonomyTagsField from "./TaxonomyTagsField.vue"
-// import KTaxonomyInput from "./TaxonomyInput.vue";
 
+const panel = usePanel();
 panel.plugin("daandelange/clavisverbum", {
   components: {
     'k-structure-field-mixin' : {
